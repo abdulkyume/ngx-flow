@@ -170,57 +170,12 @@ export class DiagramComponent implements OnInit, OnDestroy {
 
   onPointerDown(event: PointerEvent): void {
     let targetElement = event.target as Element;
-    console.log('onPointerDown', { target: targetElement, class: targetElement.className });
+    console.log('onPointerDown', { target: targetElement, tagName: targetElement.tagName, className: targetElement.className });
 
     let handleElement = targetElement.closest('.ngx-flow__handle') as HTMLElement;
     const nodeElement = targetElement.closest('.ngx-flow__node') as HTMLElement;
 
-    // Manual hit testing fallback for handles if hitbox captured the event
-    if (!handleElement && nodeElement && targetElement.classList.contains('ngx-flow__hitbox')) {
-      const nodeId = nodeElement.dataset['id'];
-      const node = this.nodes().find(n => n.id === nodeId);
-      if (node) {
-        // Use getBoundingClientRect for robust coordinate calculation relative to the hitbox
-        const hitboxRect = targetElement.getBoundingClientRect();
-        const zoom = this.viewport().zoom;
-        
-        const clickX = (event.clientX - hitboxRect.left) / zoom;
-        const clickY = (event.clientY - hitboxRect.top) / zoom;
-        
-        console.log('Manual hit test', { clickX, clickY, zoom, rect: hitboxRect });
-
-        // Check distance to each handle (relative to node)
-        const handles = ['top', 'right', 'bottom', 'left'];
-        for (const handleId of handles) {
-          // Calculate handle position relative to node
-          const nodeWidth = node.width || this.defaultNodeWidth;
-          const nodeHeight = node.height || this.defaultNodeHeight;
-          let handleX = 0;
-          let handleY = 0;
-
-          switch (handleId) {
-            case 'top': handleX = nodeWidth / 2; handleY = 0; break;
-            case 'right': handleX = nodeWidth; handleY = nodeHeight / 2; break;
-            case 'bottom': handleX = nodeWidth / 2; handleY = nodeHeight; break;
-            case 'left': handleX = 0; handleY = nodeHeight / 2; break;
-          }
-
-          const dist = Math.sqrt(Math.pow(clickX - handleX, 2) + Math.pow(clickY - handleY, 2));
-          
-          // 20px radius for hit testing
-          if (dist <= 20) {
-            // Found a handle!
-            const handleSelector = `.ngx-flow__handle[data-nodeid="${node.id}"][data-handleid="${handleId}"]`;
-            const foundHandle = nodeElement.querySelector(handleSelector) as HTMLElement;
-            if (foundHandle) {
-              console.log('Manual hit found handle', handleId);
-              handleElement = foundHandle;
-              break;
-            }
-          }
-        }
-      }
-    }
+    console.log('Element detection', { handleElement, nodeElement });
 
     if (event.button !== 0) return;
 
@@ -235,8 +190,6 @@ export class DiagramComponent implements OnInit, OnDestroy {
         const node = this.nodes().find(n => n.id === nodeId);
         if (node && node.draggable) {
             this.startDraggingNode(event, node);
-        } else {
-            console.log('Node not draggable', { node, draggable: node?.draggable });
         }
         // Select Node
         if (node) {
@@ -244,6 +197,7 @@ export class DiagramComponent implements OnInit, OnDestroy {
              this.diagramStateService.selectNodes([node.id], event.ctrlKey || event.metaKey || event.shiftKey);
         }
     } else {
+        console.log('No node or handle detected, checking canvas');
         // Pan or Select
          const isClickingOnCanvas = targetElement === this.svgRef.nativeElement || targetElement.classList.contains('ngx-flow__background');
          if (isClickingOnCanvas) {
@@ -270,7 +224,6 @@ export class DiagramComponent implements OnInit, OnDestroy {
   }
 
   onPointerUp(event: PointerEvent): void {
-    console.log('onPointerUp', { isDragging: this.isDraggingNode, isConnecting: this.isConnecting });
     if (this.isConnecting) {
         this.finishConnecting(event);
     } else if (this.isDraggingNode) {
@@ -299,6 +252,8 @@ export class DiagramComponent implements OnInit, OnDestroy {
 
       const nodeId = handleElement.dataset['nodeid'];
       const handleId = handleElement.dataset['handleid'];
+
+      console.log('startConnecting', { nodeId, handleId });
 
       if (!nodeId) return;
 
@@ -330,6 +285,7 @@ export class DiagramComponent implements OnInit, OnDestroy {
         targetX: sourceX,
         targetY: sourceY,
       };
+      console.log('Adding temp edge', newTempEdge);
       this.diagramStateService.addTempEdge(newTempEdge);
   }
 
@@ -346,20 +302,31 @@ export class DiagramComponent implements OnInit, OnDestroy {
 
         this.diagramStateService.updateTempEdgeTarget(this.currentPreviewEdgeId!, { x: currentPointerX, y: currentPointerY });
 
-        const targetHandleEl = event.target as HTMLElement;
-        const closestHandle = targetHandleEl.closest('.ngx-flow__handle') as HTMLElement;
+        // Use elementFromPoint to find what's actually under the mouse
+        // because setPointerCapture causes event.target to always be the captured element
+        const elementUnderMouse = document.elementFromPoint(event.clientX, event.clientY);
+        const closestHandle = elementUnderMouse?.closest('.ngx-flow__handle') as HTMLElement;
+
+        console.log('updateConnection', { 
+          elementUnderMouse: elementUnderMouse?.tagName, 
+          closestHandle: closestHandle ? 'found' : 'null',
+          nodeId: closestHandle?.dataset['nodeid'],
+          handleId: closestHandle?.dataset['handleid']
+        });
 
         this.clearTargetHandleHighlight();
 
         if (closestHandle) {
           const targetNodeId = closestHandle.dataset['nodeid'];
           const targetHandleId = closestHandle.dataset['handleid'];
-          const targetHandleType = closestHandle.dataset['type'];
 
-          if (targetHandleType === 'target' && targetNodeId && targetNodeId !== this.connectingSourceNodeId) {
+          // Allow connecting to any handle on a different node
+          if (targetNodeId && targetNodeId !== this.connectingSourceNodeId) {
+            console.log('Valid target handle found!', { targetNodeId, targetHandleId });
             this.currentTargetHandle = { nodeId: targetNodeId, handleId: targetHandleId, type: 'target' };
             this.renderer.addClass(closestHandle, 'ngx-flow__handle--valid-target');
           } else {
+            console.log('Same node or no nodeId');
             this.currentTargetHandle = null;
           }
         } else {
@@ -372,6 +339,12 @@ export class DiagramComponent implements OnInit, OnDestroy {
       event.stopPropagation();
       event.preventDefault();
 
+      console.log('finishConnecting', { 
+        currentTargetHandle: this.currentTargetHandle, 
+        connectingSourceNodeId: this.connectingSourceNodeId,
+        currentPreviewEdgeId: this.currentPreviewEdgeId 
+      });
+
       this.isConnecting = false;
       this.svgRef.nativeElement.releasePointerCapture(event.pointerId);
       this.clearTargetHandleHighlight();
@@ -381,6 +354,12 @@ export class DiagramComponent implements OnInit, OnDestroy {
       }
 
       if (this.currentTargetHandle && this.connectingSourceNodeId) {
+        console.log('Creating edge', {
+          source: this.connectingSourceNodeId,
+          sourceHandle: this.connectingSourceHandleId,
+          target: this.currentTargetHandle.nodeId,
+          targetHandle: this.currentTargetHandle.handleId
+        });
         const newEdge: Edge = {
           id: uuidv4(),
           source: this.connectingSourceNodeId,
@@ -390,6 +369,8 @@ export class DiagramComponent implements OnInit, OnDestroy {
           type: 'bezier',
         };
         this.diagramStateService.addEdge(newEdge);
+      } else {
+        console.log('No valid target handle, edge not created');
       }
 
       this.currentPreviewEdgeId = null;
@@ -406,7 +387,6 @@ export class DiagramComponent implements OnInit, OnDestroy {
   // --- Dragging Logic ---
 
   private startDraggingNode(event: PointerEvent, node: Node): void {
-      console.log('startDraggingNode', node.id);
       event.stopPropagation();
       this.isDraggingNode = true;
       this.draggingNode = node;
@@ -424,8 +404,6 @@ export class DiagramComponent implements OnInit, OnDestroy {
         const zoom = this.viewport().zoom;
         const deltaX = (event.clientX - this.startPointerPosition.x) / zoom;
         const deltaY = (event.clientY - this.startPointerPosition.y) / zoom;
-
-        console.log('dragNode', { deltaX, deltaY });
 
         const newPosition = {
           x: this.startNodePosition.x + deltaX,

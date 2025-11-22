@@ -53,16 +53,7 @@
        [class.dragging]="node.dragging"
        [attr.transform]="'translate(' + node.position.x + ',' + node.position.y + ')'">
 
-      <!-- Hitbox for dragging (transparent, behind everything) -->
-      <rect
-        [attr.width]="node.width || defaultNodeWidth"
-        [attr.height]="node.height || defaultNodeHeight"
-        rx="3"
-        ry="3"
-        class="ngx-flow__hitbox"
-      ></rect>
-
-      <!-- Node outline and background (visual only, no pointer events) -->
+      <!-- Node outline and background (visual + dragging) -->
       <rect
         [attr.width]="node.width || defaultNodeWidth"
         [attr.height]="node.height || defaultNodeHeight"
@@ -86,12 +77,12 @@
 
       <!-- Node handles (Inlined) -->
       <!-- Top Handle -->
-      <g class="ngx-flow__handle ngx-flow__handle--source"
+      <g class="ngx-flow__handle ngx-flow__handle--source ngx-flow__handle--target"
          [attr.data-nodeid]="node.id"
          data-handleid="top"
-         data-type="source">
+         [attr.data-type]="'source'">
           <!-- Hit area -->
-          <circle [attr.cx]="(node.width || defaultNodeWidth) / 2" [attr.cy]="0" r="15" fill="transparent" pointer-events="all"></circle>
+          <circle [attr.cx]="(node.width || defaultNodeWidth) / 2" cy="-10" r="20" fill="transparent" pointer-events="all"></circle>
           <!-- Visual -->
           <circle
             [attr.cx]="(node.width || defaultNodeWidth) / 2"
@@ -101,12 +92,12 @@
           ></circle>
       </g>
       <!-- Right Handle -->
-      <g class="ngx-flow__handle ngx-flow__handle--source"
+      <g class="ngx-flow__handle ngx-flow__handle--source ngx-flow__handle--target"
          [attr.data-nodeid]="node.id"
          data-handleid="right"
-         data-type="source">
+         [attr.data-type]="'source'">
           <!-- Hit area -->
-          <circle [attr.cx]="(node.width || defaultNodeWidth)" [attr.cy]="(node.height || defaultNodeHeight) / 2" r="15" fill="transparent" pointer-events="all"></circle>
+          <circle [attr.cx]="(node.width || defaultNodeWidth) + 10" [attr.cy]="(node.height || defaultNodeHeight) / 2" r="20" fill="transparent" pointer-events="all"></circle>
           <!-- Visual -->
           <circle
             [attr.cx]="(node.width || defaultNodeWidth)"
@@ -116,12 +107,12 @@
           ></circle>
       </g>
       <!-- Bottom Handle -->
-      <g class="ngx-flow__handle ngx-flow__handle--source"
+      <g class="ngx-flow__handle ngx-flow__handle--source ngx-flow__handle--target"
          [attr.data-nodeid]="node.id"
          data-handleid="bottom"
-         data-type="source">
+         [attr.data-type]="'source'">
           <!-- Hit area -->
-          <circle [attr.cx]="(node.width || defaultNodeWidth) / 2" [attr.cy]="(node.height || defaultNodeHeight)" r="15" fill="transparent" pointer-events="all"></circle>
+          <circle [attr.cx]="(node.width || defaultNodeWidth) / 2" [attr.cy]="(node.height || defaultNodeHeight) + 10" r="20" fill="transparent" pointer-events="all"></circle>
           <!-- Visual -->
           <circle
             [attr.cx]="(node.width || defaultNodeWidth) / 2"
@@ -131,12 +122,12 @@
           ></circle>
       </g>
       <!-- Left Handle -->
-      <g class="ngx-flow__handle ngx-flow__handle--source"
+      <g class="ngx-flow__handle ngx-flow__handle--source ngx-flow__handle--target"
          [attr.data-nodeid]="node.id"
          data-handleid="left"
-         data-type="source">
+         [attr.data-type]="'source'">
           <!-- Hit area -->
-          <circle [attr.cx]="0" [attr.cy]="(node.height || defaultNodeHeight) / 2" r="15" fill="transparent" pointer-events="all"></circle>
+          <circle cx="-10" [attr.cy]="(node.height || defaultNodeHeight) / 2" r="20" fill="transparent" pointer-events="all"></circle>
           <!-- Visual -->
           <circle
             [attr.cx]="0"

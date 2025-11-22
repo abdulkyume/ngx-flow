@@ -49,19 +49,21 @@
   fill: var(--ngx-flow-node-bg, #fff);
   stroke: var(--ngx-flow-node-border, #1a192b);
   stroke-width: 1.5px;
-  pointer-events: none; /* Let events pass through to hitbox or handles */
+  pointer-events: all; /* Allow dragging via node body */
+  cursor: grab;
 }
 
 .ngx-flow__hitbox {
   fill: transparent;
   cursor: grab;
+  pointer-events: none; /* Not used anymore */
 }
 
 .ngx-flow__node-label {
   font-family: sans-serif;
   font-size: 14px;
   fill: var(--ngx-flow-node-text-color, #333);
-  pointer-events: none; /* Let events pass through */
+  pointer-events: none; /* Let events pass through to node-rect */
 }
 
 /* Edge Styles */
