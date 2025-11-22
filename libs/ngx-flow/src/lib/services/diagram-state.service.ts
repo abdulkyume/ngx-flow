@@ -151,12 +151,12 @@ export class DiagramStateService {
 
   removeNode(id: string): void {
     this.undoRedoService.saveState(this.getCurrentState());
-    this.nodes.update((currentNodes) => currentNodes.filter((node) => !id.includes(node.id)));
+    this.nodes.update((currentNodes) => currentNodes.filter((node) => node.id !== id));
     this.edges.update((currentEdges) =>
-      currentEdges.filter((edge) => !id.includes(edge.source) && !id.includes(edge.target))
+      currentEdges.filter((edge) => edge.source !== id && edge.target !== id)
     );
     this.tempEdges.update((currentTempEdges) =>
-      currentTempEdges.filter((edge) => !id.includes(edge.source) && !id.includes(edge.target))
+      currentTempEdges.filter((edge) => edge.source !== id && edge.target !== id)
     );
   }
 

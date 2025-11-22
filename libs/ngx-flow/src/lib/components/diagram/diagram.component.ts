@@ -176,10 +176,28 @@ export class DiagramComponent implements OnInit, OnDestroy, OnChanges {
   ngOnChanges(changes: SimpleChanges): void {
     // Handle changes to input properties after initialization
     if (changes['initialNodes'] && !changes['initialNodes'].firstChange) {
-      // Clear existing nodes and add new ones
+      // Sync nodes: add new ones, remove deleted ones, update existing ones
       const currentNodes = this.nodes();
-      currentNodes.forEach(node => this.diagramStateService.removeNode(node.id));
-      this.initialNodes.forEach(node => this.diagramStateService.addNode(node));
+      const currentNodeIds = new Set(currentNodes.map(n => n.id));
+      const newNodeIds = new Set(this.initialNodes.map(n => n.id));
+      
+      // Remove nodes that are no longer in initialNodes
+      currentNodes.forEach(node => {
+        if (!newNodeIds.has(node.id)) {
+          this.diagramStateService.removeNode(node.id);
+        }
+      });
+      
+      // Add or update nodes from initialNodes
+      this.initialNodes.forEach(node => {
+        if (!currentNodeIds.has(node.id)) {
+          // New node - add it
+          this.diagramStateService.addNode(node);
+        } else {
+          // Existing node - update it
+          this.diagramStateService.updateNode(node.id, node);
+        }
+      });
     }
     if (changes['initialEdges'] && !changes['initialEdges'].firstChange) {
       // Set edges directly without triggering connect events
