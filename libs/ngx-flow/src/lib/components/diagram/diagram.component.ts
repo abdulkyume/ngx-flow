@@ -124,13 +124,15 @@ export class DiagramComponent implements OnInit, OnDestroy, OnChanges {
       this.initialNodes.forEach(node => this.diagramStateService.addNode(node));
     }
     if (this.initialEdges.length > 0) {
-      this.initialEdges.forEach(edge => this.diagramStateService.addEdge(edge));
+      // Add initial edges directly to the signal without triggering connect events
+      this.diagramStateService.edges.set([...this.initialEdges]);
     }
     if (this.initialViewport) {
       this.diagramStateService.setViewport(this.initialViewport);
     }
 
     // Subscribe to state changes and emit events
+    // Note: We only subscribe to connect events from user interactions, not programmatic additions
     this.subscriptions.add(
       this.diagramStateService.nodeClick.subscribe((node: Node) => this.nodeClick.emit(node))
     );
@@ -157,10 +159,8 @@ export class DiagramComponent implements OnInit, OnDestroy, OnChanges {
       this.initialNodes.forEach(node => this.diagramStateService.addNode(node));
     }
     if (changes['initialEdges'] && !changes['initialEdges'].firstChange) {
-      // Clear existing edges and add new ones
-      const currentEdges = this.edges();
-      currentEdges.forEach(edge => this.diagramStateService.removeEdge(edge.id));
-      this.initialEdges.forEach(edge => this.diagramStateService.addEdge(edge));
+      // Set edges directly without triggering connect events
+      this.diagramStateService.edges.set([...this.initialEdges]);
     }
     if (changes['initialViewport'] && !changes['initialViewport'].firstChange && this.initialViewport) {
       this.diagramStateService.setViewport(this.initialViewport);

@@ -75,7 +75,6 @@ export class App implements OnInit {
   }
 
   onConnect(connection: { source: string; sourceHandle?: string; target: string; targetHandle?: string }): void {
-    console.log('New connection:', connection);
     const newEdge: Edge = {
       id: uuidv4(),
       source: connection.source,
