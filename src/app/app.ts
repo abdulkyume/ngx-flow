@@ -1,12 +1,10 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnInit, signal } from '@angular/core';
+import { Component, OnInit } from '@angular/core';
 
 import {
-  DiagramStateService,
   LayoutService,
   Node,
   Edge,
-  XYPosition,
   Viewport,
   NgxFlowModule,
 } from 'ngx-flow';
@@ -21,81 +19,88 @@ import { v4 as uuidv4 } from 'uuid';
 export class App implements OnInit {
   title = 'ngx-flow-demo';
 
-  constructor(
-    private diagramStateService: DiagramStateService,
-    private layoutService: LayoutService
-  ) {}
+  // Data properties for declarative binding
+  nodes: Node[] = [];
+  edges: Edge[] = [];
+  viewport: Viewport = { x: 0, y: 0, zoom: 1 };
+
+  constructor(private layoutService: LayoutService) {}
 
   ngOnInit(): void {
     // Initial setup: Add some nodes and edges to demonstrate
-    this.addNode({ id: '1', position: { x: 50, y: 50 }, data: { label: 'Start' } });
-    this.addNode({
-      id: '2',
-      position: { x: 250, y: 150 },
-      data: { label: 'Process A' },
-      type: 'rounded-rect',
-    });
-    this.addNode({ id: '3', position: { x: 50, y: 250 }, data: { label: 'Process B' } });
-    this.addNode({ id: '4', position: { x: 450, y: 250 }, data: { label: 'End' } });
-    this.addEdge({ id: 'e1-2', source: '1', target: '2', type: 'bezier' });
-    this.addEdge({ id: 'e1-3', source: '1', target: '3', type: 'step' });
-    this.addEdge({ id: 'e2-4', source: '2', target: '4', animated: true });
-    this.addEdge({ id: 'e3-4', source: '3', target: '4', type: 'straight' });
-  }
+    this.nodes = [
+      { id: '1', position: { x: 50, y: 50 }, data: { label: 'Start' }, draggable: true },
+      { id: '2', position: { x: 250, y: 150 }, data: { label: 'Process A' }, type: 'rounded-rect', draggable: true },
+      { id: '3', position: { x: 50, y: 250 }, data: { label: 'Process B' }, draggable: true },
+      { id: '4', position: { x: 450, y: 250 }, data: { label: 'End' }, draggable: true }
+    ];
 
-  addNode(node: Node): void {
-    this.diagramStateService.addNode({ ...node, id: node.id || uuidv4(), draggable: true });
-  }
-
-  addEdge(edge: Edge): void {
-    this.diagramStateService.addEdge({ ...edge, id: edge.id || uuidv4() });
+    this.edges = [
+      { id: 'e1-2', source: '1', target: '2', type: 'bezier' },
+      { id: 'e1-3', source: '1', target: '3', type: 'step' },
+      { id: 'e2-4', source: '2', target: '4', animated: true },
+      { id: 'e3-4', source: '3', target: '4', type: 'straight' }
+    ];
   }
 
   addRandomNode(): void {
     const newNode: Node = {
       id: uuidv4(),
       position: { x: Math.random() * 500, y: Math.random() * 300 },
-      data: { label: `Node ${this.diagramStateService.nodes().length + 1}` },
+      data: { label: `Node ${this.nodes.length + 1}` },
       type: Math.random() > 0.5 ? 'default' : 'rounded-rect',
       draggable: true,
     };
-    this.diagramStateService.addNode(newNode);
+    this.nodes = [...this.nodes, newNode];
   }
 
   clearFlow(): void {
-    this.diagramStateService.nodes.set([]);
-    this.diagramStateService.edges.set([]);
-    this.diagramStateService.tempEdges.set([]);
+    this.nodes = [];
+    this.edges = [];
   }
 
   async applyElkLayout(): Promise<void> {
-    const currentNodes = this.diagramStateService.nodes();
-    const currentEdges = this.diagramStateService.edges();
-    const laidOutNodes = await this.layoutService.applyElkLayout(currentNodes, currentEdges);
-
-    laidOutNodes.forEach((node: Node) => {
-      this.diagramStateService.updateNode(node.id, { position: node.position });
-    });
+    const laidOutNodes = await this.layoutService.applyElkLayout(this.nodes, this.edges);
+    this.nodes = laidOutNodes;
   }
 
-  // Placeholder for FitView
   fitView(): void {
-    // The DiagramComponent has a fitView() method. You might want to call it directly
-    // from a template reference or expose it through the state service if the demo
-    // component needs to trigger it. For now, just a log.
-    console.log('Fit View clicked (DiagramComponent needs to expose this)');
+    // Reset viewport to default
+    this.viewport = { x: 0, y: 0, zoom: 1 };
   }
 
-  // Debugging / State display
+  // Event handlers
+  onNodeClick(node: Node): void {
+    console.log('Node clicked:', node);
+  }
+
+  onConnect(connection: { source: string; sourceHandle?: string; target: string; targetHandle?: string }): void {
+    console.log('New connection:', connection);
+    const newEdge: Edge = {
+      id: uuidv4(),
+      source: connection.source,
+      sourceHandle: connection.sourceHandle,
+      target: connection.target,
+      targetHandle: connection.targetHandle,
+      type: 'bezier'
+    };
+    this.edges = [...this.edges, newEdge];
+  }
+
+  onNodesChange(nodes: Node[]): void {
+    this.nodes = nodes;
+  }
+
+  onEdgesChange(edges: Edge[]): void {
+    this.edges = edges;
+  }
+
+  // Computed properties for display
   get nodesCount(): number {
-    return this.diagramStateService.nodes().length;
+    return this.nodes.length;
   }
 
   get edgesCount(): number {
-    return this.diagramStateService.edges().length;
-  }
-
-  get viewport(): Viewport {
-    return this.diagramStateService.viewport();
+    return this.edges.length;
   }
 }

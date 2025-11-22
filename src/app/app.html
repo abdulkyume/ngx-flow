@@ -9,7 +9,16 @@
 </div>
 
 <div class="flow-container">
-  <ngx-diagram class="flow-diagram"></ngx-diagram>
+  <ngx-diagram 
+    class="flow-diagram"
+    [initialNodes]="nodes"
+    [initialEdges]="edges"
+    [initialViewport]="viewport"
+    (nodeClick)="onNodeClick($event)"
+    (connect)="onConnect($event)"
+    (nodesChange)="onNodesChange($event)"
+    (edgesChange)="onEdgesChange($event)"
+  ></ngx-diagram>
 </div>
 
 <div class="footer">
