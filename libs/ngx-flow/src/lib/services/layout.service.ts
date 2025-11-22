@@ -1,10 +1,6 @@
 import { Injectable } from '@angular/core';
 import { Node, Edge, XYPosition } from '../models';
-import * as dagre from '@dagrejs/dagre';
 import ELK, { ElkNode } from 'elkjs/lib/elk.bundled';
-
-// Declare global for dagre as it doesn't always have proper types in some setups
-declare const dagre: any;
 
 @Injectable({
   providedIn: 'root',
@@ -15,49 +11,6 @@ export class LayoutService {
 
   constructor() {
     this.elk = new ELK();
-  }
-
-  // --- Dagre Layout ---
-  async applyDagreLayout(nodes: Node[], edges: Edge[], options?: { rankdir?: 'TB' | 'LR'; align?: 'UL' | 'UR' | 'DL' | 'DR'; nodesep?: number; ranksep?: number }): Promise<Node[]> {
-    const graph = new dagre.graphlib.Graph();
-    graph.setGraph({
-      rankdir: options?.rankdir || 'TB', // Top-to-bottom or Left-to-right
-      align: options?.align,
-      nodesep: options?.nodesep || 50,
-      ranksep: options?.ranksep || 50,
-      marginx: 20,
-      marginy: 20,
-    });
-    graph.setDefaultEdgeLabel(() => ({})); // Required for dagre
-
-    // Add nodes to the graph, ensuring they have dimensions
-    nodes.forEach(node => {
-      graph.setNode(node.id, {
-        width: node.width || 170, // Default width if not set
-        height: node.height || 60, // Default height if not set
-      });
-    });
-
-    // Add edges to the graph
-    edges.forEach(edge => {
-      graph.setEdge(edge.source, edge.target);
-    });
-
-    dagre.layout(graph); // Perform layout calculation
-
-    // Map new positions back to nodes
-    const laidOutNodes = nodes.map(node => {
-      const graphNode = graph.node(node.id);
-      return {
-        ...node,
-        position: {
-          x: graphNode.x - (node.width || 170) / 2, // Adjust to top-left corner
-          y: graphNode.y - (node.height || 60) / 2, // Adjust to top-left corner
-        },
-      };
-    });
-
-    return laidOutNodes;
   }
 
   // --- ELK Layout ---

@@ -68,23 +68,12 @@ export class App implements OnInit {
     this.diagramStateService.tempEdges.set([]);
   }
 
-  async applyDagreLayout(): Promise<void> {
-    const currentNodes = this.diagramStateService.nodes();
-    const currentEdges = this.diagramStateService.edges();
-    const laidOutNodes = await this.layoutService.applyDagreLayout(currentNodes, currentEdges);
-
-    // Update positions of nodes in the state service
-    laidOutNodes.forEach((node) => {
-      this.diagramStateService.updateNode(node.id, { position: node.position });
-    });
-  }
-
   async applyElkLayout(): Promise<void> {
     const currentNodes = this.diagramStateService.nodes();
     const currentEdges = this.diagramStateService.edges();
     const laidOutNodes = await this.layoutService.applyElkLayout(currentNodes, currentEdges);
 
-    laidOutNodes.forEach((node) => {
+    laidOutNodes.forEach((node: Node) => {
       this.diagramStateService.updateNode(node.id, { position: node.position });
     });
   }

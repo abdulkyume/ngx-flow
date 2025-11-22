@@ -29,3 +29,93 @@
   stroke-dasharray: 5 5;
   pointer-events: none; /* Make selection box non-interactive */
 }
+
+/* Node Styles */
+.ngx-flow__node {
+  cursor: grab;
+
+  &.selected .ngx-flow__node-rect {
+    stroke: var(--ngx-flow-selection-color, #1a192b);
+    stroke-width: 2px;
+  }
+
+  &.dragging {
+    cursor: grabbing;
+    opacity: 0.8;
+  }
+}
+
+.ngx-flow__node-rect {
+  fill: var(--ngx-flow-node-bg, #fff);
+  stroke: var(--ngx-flow-node-border, #1a192b);
+  stroke-width: 1.5px;
+  pointer-events: none; /* Let events pass through to hitbox or handles */
+}
+
+.ngx-flow__hitbox {
+  fill: transparent;
+  cursor: grab;
+}
+
+.ngx-flow__node-label {
+  font-family: sans-serif;
+  font-size: 14px;
+  fill: var(--ngx-flow-node-text-color, #333);
+  pointer-events: none; /* Let events pass through */
+}
+
+/* Edge Styles */
+.ngx-flow__edge-path {
+  stroke: var(--ngx-flow-edge-color, #b1b1b7);
+  stroke-width: 2;
+  fill: none;
+  pointer-events: none; /* Make path non-interactive to rely on hitbox */
+}
+
+.ngx-flow__edge-hitbox {
+  stroke: transparent;
+  stroke-width: 20; /* Invisible wider path for easier clicking */
+  fill: none;
+  cursor: pointer;
+  stroke-linecap: round;
+}
+
+.ngx-flow__edge.selected .ngx-flow__edge-path {
+  stroke: var(--ngx-flow-selection-color, #1a192b);
+}
+
+.ngx-flow__edge.animated .ngx-flow__edge-path {
+  stroke-dasharray: 5 5;
+  animation: dash 1s linear infinite;
+}
+
+@keyframes dash {
+  to {
+    stroke-dashoffset: -100;
+  }
+}
+
+/* Handle Styles */
+.ngx-flow__handle {
+  transform: translate(0, 0); /* Will be positioned dynamically by parent node */
+  pointer-events: all; /* Ensure handle group captures events */
+
+  &--source .ngx-flow__handle-circle {
+    fill: var(--ngx-flow-source-handle-color, #1a192b);
+    stroke: var(--ngx-flow-source-handle-border, #fff);
+    stroke-width: 1.5;
+    pointer-events: all; /* Ensure handle captures events */
+  }
+
+  &--target .ngx-flow__handle-circle {
+    fill: var(--ngx-flow-target-handle-color, #1a192b);
+    stroke: var(--ngx-flow-target-handle-border, #fff);
+    stroke-width: 1.5;
+    pointer-events: all; /* Ensure handle captures events */
+  }
+
+  &--valid-target .ngx-flow__handle-circle {
+    fill: var(--ngx-flow-handle-valid-target-color, #00ff00);
+    stroke: var(--ngx-flow-handle-valid-target-border, #007f00);
+  }
+}

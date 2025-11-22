@@ -6,9 +6,6 @@ export * from './lib/ngx-flow.module';
 
 // Components
 export * from './lib/components/diagram/diagram.component';
-export * from './lib/components/node/node.component';
-export * from './lib/components/edge/edge.component';
-export * from './lib/components/handle/handle.component';
 export * from './lib/components/custom-node/rounded-rect-node.component';
 
 // Services

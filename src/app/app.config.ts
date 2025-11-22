@@ -18,7 +18,6 @@ import { provideRouter } from '@angular/router';
 
 export const appConfig: ApplicationConfig = {
   providers: [
-    provideBrowserGlobalErrorListeners(),
     provideZonelessChangeDetection(),
     provideRouter(routes),
 
@@ -35,8 +34,3 @@ export const appConfig: ApplicationConfig = {
     },
   ],
 };
-function provideBrowserGlobalErrorListeners():
-  | import('@angular/core').Provider
-  | import('@angular/core').EnvironmentProviders {
-  throw new Error('Function not implemented.');
-}

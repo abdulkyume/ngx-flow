@@ -9,8 +9,8 @@
 Before using the layout features, ensure you have installed the necessary external libraries.
 
 ```bash
-npm install @dagrejs/dagre elkjs
-npm install --save-dev @types/dagre @types/elkjs # For TypeScript support
+npm install elkjs
+npm install --save-dev @types/elkjs # For TypeScript support (optional)
 ```
 
 ## 2. Use the `LayoutService`
@@ -30,7 +30,6 @@ import { DiagramComponent } from 'ngx-flow'; // Assuming DiagramComponent is use
   imports: [CommonModule, DiagramComponent],
   template: `
     <div style="height: 500px; width: 100%;">
-      <button (click)="applyDagre()">Apply Dagre Layout</button>
       <button (click)="applyElk()">Apply ELK Layout</button>
       <ngx-diagram></ngx-diagram>
     </div>
@@ -49,25 +48,11 @@ export class MyFlowComponent {
     this.diagramStateService.addEdge({ id: 'ac', source: 'a', target: 'c' });
   }
 
-  async applyDagre(): Promise<void> {
-    const currentNodes = this.diagramStateService.nodes();
-    const currentEdges = this.diagramStateService.edges();
-
-    // Dagre needs node dimensions to calculate layout accurately
-    // Ensure your nodes have width/height or provide defaults in LayoutService
-    const laidOutNodes = await this.layoutService.applyDagreLayout(currentNodes, currentEdges, { rankdir: 'LR' });
-
-    // Update node positions in the state service
-    laidOutNodes.forEach(node => {
-      this.diagramStateService.updateNode(node.id, { position: node.position });
-    });
-  }
-
   async applyElk(): Promise<void> {
     const currentNodes = this.diagramStateService.nodes();
     const currentEdges = this.diagramStateService.edges();
 
-    // ELK also needs node dimensions
+    // ELK needs node dimensions to calculate layout accurately
     const laidOutNodes = await this.layoutService.applyElkLayout(currentNodes, currentEdges, {
       'elk.algorithm': 'layered',
       'elk.direction': 'RIGHT',
@@ -83,20 +68,6 @@ export class MyFlowComponent {
 ```
 
 ## `LayoutService` Methods
-
-### `applyDagreLayout(nodes: Node[], edges: Edge[], options?: DagreLayoutOptions): Promise<Node[]>`
-
-Applies the Dagre layout algorithm.
-
--   `nodes`: An array of `Node` objects.
--   `edges`: An array of `Edge` objects.
--   `options`: An optional object for Dagre configuration.
-    -   `rankdir?: 'TB' | 'LR'` (default: `'TB'`) Top-to-bottom or Left-to-right.
-    -   `align?: 'UL' | 'UR' | 'DL' | 'DR'`
-    -   `nodesep?: number` (default: 50) Minimum space between nodes.
-    -   `ranksep?: number` (default: 50) Minimum space between ranks.
-
-Returns a `Promise` that resolves with a new array of `Node` objects, including their calculated `position` properties.
 
 ### `applyElkLayout(nodes: Node[], edges: Edge[], options?: ElkLayoutOptions): Promise<Node[]>`
 
@@ -116,6 +87,6 @@ Returns a `Promise` that resolves with a new array of `Node` objects, including 
 
 **Important Considerations:**
 
--   **Node Dimensions:** For both Dagre and ELK to calculate optimal layouts, it is crucial that your `Node` objects have meaningful `width` and `height` properties. If not provided, the `LayoutService` uses default values (170x60).
+-   **Node Dimensions:** For ELK to calculate optimal layouts, it is crucial that your `Node` objects have meaningful `width` and `height` properties. If not provided, the `LayoutService` uses default values (170x60).
 -   **Applying Layout Results:** The layout service returns the calculated positions. You are responsible for updating your `DiagramStateService` with these new positions, typically by iterating over the returned nodes and calling `diagramStateService.updateNode(node.id, { position: node.position })`.
--   **Performance:** Layout calculations can be computationally intensive for large graphs. The `applyDagreLayout` and `applyElkLayout` methods are asynchronous, allowing your UI to remain responsive during calculation.
+-   **Performance:** Layout calculations can be computationally intensive for large graphs. The `applyElkLayout` method is asynchronous, allowing your UI to remain responsive during calculation.

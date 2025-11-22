@@ -3,9 +3,6 @@ import { CommonModule } from '@angular/common';
 
 // Components
 import { DiagramComponent } from './components/diagram/diagram.component';
-import { NodeComponent } from './components/node/node.component';
-import { EdgeComponent } from './components/edge/edge.component';
-import { HandleComponent } from './components/handle/handle.component';
 import { RoundedRectNodeComponent } from './components/custom-node/rounded-rect-node.component';
 
 // Services
@@ -23,9 +20,6 @@ import { Node } from './models';
   imports: [
     CommonModule,
     DiagramComponent,
-    NodeComponent,
-    EdgeComponent,
-    HandleComponent,
     RoundedRectNodeComponent, // Import custom node component if it's standalone
   ],
   declarations: [
@@ -43,18 +37,9 @@ import { Node } from './models';
         // Add other custom node types here
       },
     },
-    // {
-    //   provide: NGX_FLOW_EDGE_TYPES,
-    //   useValue: {
-    //     'custom-edge': CustomEdgeComponent,
-    //   },
-    // },
   ],
   exports: [
     DiagramComponent,
-    NodeComponent,
-    EdgeComponent,
-    HandleComponent,
     RoundedRectNodeComponent,
   ],
 })

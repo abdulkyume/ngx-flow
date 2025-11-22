@@ -21,8 +21,8 @@ npm install ngx-flow
 If you plan to use the automatic layout features (Dagre or ELK), you will need to install their respective libraries:
 
 ```bash
-npm install @dagrejs/dagre elkjs
-npm install --save-dev @types/dagre @types/elkjs # Install TypeScript type definitions
+npm install elkjs
+npm install --save-dev @types/elkjs # Install TypeScript type definitions (optional)
 ```
 
 ## Step 3: Install UUID for Unique IDs (Optional but Recommended)
