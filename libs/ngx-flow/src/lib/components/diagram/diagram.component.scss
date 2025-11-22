@@ -46,6 +46,17 @@
     cursor: grabbing;
     opacity: 0.8;
   }
+
+  &.invalid-connection .ngx-flow__node-rect {
+    stroke: #ff0000;
+    stroke-width: 2px;
+    animation: flash 0.2s ease-in-out 3;
+  }
+}
+
+@keyframes flash {
+  0%, 100% { stroke: #ff0000; }
+  50% { stroke: var(--ngx-flow-node-border, #1a192b); }
 }
 
 .ngx-flow__node-rect {

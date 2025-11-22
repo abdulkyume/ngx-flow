@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, ViewChild } from '@angular/core';
 
 import {
   LayoutService,
@@ -7,6 +7,7 @@ import {
   Edge,
   Viewport,
   NgxFlowModule,
+  DiagramComponent,
 } from 'ngx-flow';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -125,39 +126,58 @@ export class App implements OnInit {
   get edgesCount(): number {
     return this.edges.length;
   }
-  // Export the current diagram state as JSON and trigger download
+
+  // Access the diagram component to call export methods
+  @ViewChild(DiagramComponent) diagram?: DiagramComponent;
+
   exportJSON(): void {
-    const diagramState = {
-      nodes: this.nodes,
-      edges: this.edges,
-      viewport: this.viewport,
-    };
-    const jsonStr = JSON.stringify(diagramState, null, 2);
-    const blob = new Blob([jsonStr], { type: 'application/json' });
+    if (!this.diagram) return;
+    const state = this.diagram.getDiagramState();
+    const json = JSON.stringify(state, null, 2);
+    const blob = new Blob([json], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'diagram.json';
-    a.click();
+    
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'diagram.json';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
     URL.revokeObjectURL(url);
   }
 
-  // Import diagram state from a selected JSON file
   importJSON(event: Event): void {
     const input = event.target as HTMLInputElement;
-    if (!input.files?.length) return;
+    if (!input.files?.length || !this.diagram) return;
+
     const file = input.files[0];
     const reader = new FileReader();
-    reader.onload = () => {
+    
+    reader.onload = (e) => {
       try {
-        const parsed = JSON.parse(reader.result as string);
-        if (parsed.nodes) this.nodes = parsed.nodes;
-        if (parsed.edges) this.edges = parsed.edges;
-        if (parsed.viewport) this.viewport = parsed.viewport;
-      } catch (e) {
-        console.error('Failed to parse diagram JSON', e);
+        const json = e.target?.result as string;
+        const state = JSON.parse(json);
+        this.diagram!.setDiagramState(state);
+      } catch (err) {
+        console.error('Failed to parse JSON', err);
+        alert('Invalid JSON file');
       }
     };
+    
     reader.readAsText(file);
+    // Reset input so same file can be selected again
+    input.value = '';
+  }
+
+  exportPNG(): void {
+    if (this.diagram) {
+      this.diagram.exportToPNG();
+    }
+  }
+
+  exportSVG(): void {
+    if (this.diagram) {
+      this.diagram.exportToSVG();
+    }
   }
 }

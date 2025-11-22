@@ -1,13 +1,14 @@
 import { Component, ChangeDetectionStrategy, ElementRef, OnInit, Renderer2, NgZone, OnDestroy, HostListener, WritableSignal, Inject, Optional, computed, ViewChild, Input, Output, EventEmitter, OnChanges, SimpleChanges } from '@angular/core';
 import { CommonModule, NgComponentOutlet } from '@angular/common';
 import { DiagramStateService } from '../../services/diagram-state.service';
-import { Viewport, XYPosition, Node, Edge, TempEdge } from '../../models';
+import { Viewport, XYPosition, Node, Edge, TempEdge, DiagramState } from '../../models';
 import { Subscription } from 'rxjs';
 import { NGX_FLOW_NODE_TYPES } from '../../injection-tokens';
 import { NodeComponentType } from '../../types';
 import { getBezierPath, getStraightPath, getStepPath } from '../../utils';
 import { v4 as uuidv4 } from 'uuid';
 import { ZoomControlsComponent } from '../zoom-controls/zoom-controls.component';
+import { MinimapComponent } from '../minimap/minimap.component';
 
 // Helper function to get a node from the array
 function getNode(id: string, nodes: Node[]): Node | undefined {
@@ -54,7 +55,7 @@ function getHandleAbsolutePosition(node: Node, handleId: string | undefined): XY
   styleUrls: ['./diagram.component.scss'],
   changeDetection: ChangeDetectionStrategy.OnPush,
   standalone: true,
-  imports: [CommonModule, NgComponentOutlet, ZoomControlsComponent]
+  imports: [CommonModule, NgComponentOutlet, ZoomControlsComponent, MinimapComponent]
 })
 export class DiagramComponent implements OnInit, OnDestroy, OnChanges {
   @ViewChild('svg', { static: true }) svgRef!: ElementRef<SVGSVGElement>;
@@ -64,6 +65,9 @@ export class DiagramComponent implements OnInit, OnDestroy, OnChanges {
   @Input() initialEdges: Edge[] = [];
   @Input() initialViewport?: Viewport;
   @Input() showZoomControls: boolean = true;
+
+  // Input for showing/hiding minimap
+  @Input() showMinimap: boolean = true;
 
   // Output events
   @Output() nodeClick = new EventEmitter<Node>();
@@ -105,6 +109,23 @@ export class DiagramComponent implements OnInit, OnDestroy, OnChanges {
   // Default node dimensions
   defaultNodeWidth = 170;
   defaultNodeHeight = 60;
+
+  // Input for custom connection validation (optional)
+  @Input() connectionValidator?: (sourceNodeId: string, targetNodeId: string) => boolean;
+
+  // Helper to check if a connection is allowed
+  private isValidConnection(sourceId: string, targetId: string): boolean {
+    // Prevent self-connections
+    if (sourceId === targetId) return false;
+    // Prevent duplicate edges between same source and target
+    const existing = this.edges().some(e => e.source === sourceId && e.target === targetId);
+    if (existing) return false;
+    // Use custom validator if provided
+    if (this.connectionValidator) {
+      return this.connectionValidator(sourceId, targetId);
+    }
+    return true;
+  }
 
   constructor(
     private el: ElementRef<HTMLElement>, // Host element
@@ -366,7 +387,7 @@ export class DiagramComponent implements OnInit, OnDestroy, OnChanges {
           const targetHandleId = closestHandle.dataset['handleid'];
 
           // Allow connecting to any handle on a different node
-          if (targetNodeId && targetNodeId !== this.connectingSourceNodeId) {
+          if (targetNodeId && this.isValidConnection(this.connectingSourceNodeId!, targetNodeId)) {
             this.currentTargetHandle = { nodeId: targetNodeId, handleId: targetHandleId, type: 'target' };
             this.renderer.addClass(closestHandle, 'ngx-flow__handle--valid-target');
           } else {
@@ -391,15 +412,27 @@ export class DiagramComponent implements OnInit, OnDestroy, OnChanges {
       }
 
       if (this.currentTargetHandle && this.connectingSourceNodeId) {
-        const newEdge: Edge = {
-          id: uuidv4(),
-          source: this.connectingSourceNodeId,
-          sourceHandle: this.connectingSourceHandleId,
-          target: this.currentTargetHandle.nodeId,
-          targetHandle: this.currentTargetHandle.handleId,
-          type: 'bezier',
-        };
-        this.diagramStateService.addEdge(newEdge);
+        const sourceId = this.connectingSourceNodeId;
+        const targetId = this.currentTargetHandle.nodeId;
+
+        if (this.isValidConnection(sourceId, targetId)) {
+          const newEdge: Edge = {
+            id: uuidv4(),
+            source: sourceId,
+            sourceHandle: this.connectingSourceHandleId,
+            target: targetId,
+            targetHandle: this.currentTargetHandle.handleId,
+            type: 'bezier',
+          };
+          this.diagramStateService.addEdge(newEdge);
+        } else {
+          // Visual feedback for invalid connection: flash source node
+          const sourceNodeEl = this.el.nativeElement.querySelector(`[data-nodeid="${sourceId}"]`);
+          if (sourceNodeEl) {
+            this.renderer.addClass(sourceNodeEl, 'invalid-connection');
+            setTimeout(() => this.renderer.removeClass(sourceNodeEl, 'invalid-connection'), 1000);
+          }
+        }
       }
 
       this.currentPreviewEdgeId = null;
@@ -694,5 +727,147 @@ export class DiagramComponent implements OnInit, OnDestroy, OnChanges {
     const y = (svgRect.height - boundsHeight * zoom) / 2 - minY * zoom;
 
     this.diagramStateService.setViewport({ x, y, zoom });
+  }
+
+  /**
+   * Returns the current state of the diagram (nodes, edges, viewport).
+   */
+  getDiagramState(): DiagramState {
+    return this.diagramStateService.getDiagramState();
+  }
+
+  /**
+   * Sets the state of the diagram.
+   */
+  setDiagramState(state: DiagramState): void {
+    this.diagramStateService.setDiagramState(state);
+  }
+
+  /**
+   * Exports the diagram as an SVG file.
+   * @param fileName The name of the file to download (default: 'diagram.svg')
+   * @param download Whether to trigger a download (default: true)
+   * @returns The SVG string
+   */
+  exportToSVG(fileName: string = 'diagram.svg', download: boolean = true): string {
+    const svgElement = this.svgRef.nativeElement;
+    
+    // Clone the SVG to avoid modifying the live diagram
+    const clone = svgElement.cloneNode(true) as SVGSVGElement;
+    
+    // Get the bounding box of the content (nodes and edges)
+    // We need to calculate this manually because getBBox() on the clone won't work if it's not in the DOM
+    const nodes = this.nodes();
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    
+    if (nodes.length > 0) {
+      nodes.forEach(node => {
+        minX = Math.min(minX, node.position.x);
+        minY = Math.min(minY, node.position.y);
+        maxX = Math.max(maxX, node.position.x + (node.width || this.defaultNodeWidth));
+        maxY = Math.max(maxY, node.position.y + (node.height || this.defaultNodeHeight));
+      });
+    } else {
+      minX = 0; minY = 0; maxX = 100; maxY = 100;
+    }
+
+    // Add some padding
+    const padding = 20;
+    minX -= padding;
+    minY -= padding;
+    maxX += padding;
+    maxY += padding;
+    
+    const width = maxX - minX;
+    const height = maxY - minY;
+
+    // Set the viewBox to the content bounds
+    clone.setAttribute('viewBox', `${minX} ${minY} ${width} ${height}`);
+    clone.setAttribute('width', `${width}`);
+    clone.setAttribute('height', `${height}`);
+    
+    // Remove the transform from the viewport group in the clone to reset zoom/pan
+    // The viewport group is the first child g element
+    const viewportGroup = clone.querySelector('.ngx-flow__viewport');
+    if (viewportGroup) {
+      viewportGroup.removeAttribute('transform');
+    }
+
+    // Serialize the SVG
+    const serializer = new XMLSerializer();
+    let svgString = serializer.serializeToString(clone);
+    
+    // Add XML declaration
+    if (!svgString.match(/^<xml/)) {
+      svgString = '<?xml version="1.0" encoding="utf-8"?>\n' + svgString;
+    }
+
+    if (download) {
+      const blob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      this.downloadFile(url, fileName);
+      URL.revokeObjectURL(url);
+    }
+
+    return svgString;
+  }
+
+  /**
+   * Exports the diagram as a PNG image.
+   * @param fileName The name of the file to download (default: 'diagram.png')
+   * @param download Whether to trigger a download (default: true)
+   * @returns A promise that resolves to the data URL of the PNG
+   */
+  async exportToPNG(fileName: string = 'diagram.png', download: boolean = true): Promise<string> {
+    const svgString = this.exportToSVG(fileName, false);
+    
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      const svgBlob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
+      const url = URL.createObjectURL(svgBlob);
+      
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = img.width;
+        canvas.height = img.height;
+        const ctx = canvas.getContext('2d');
+        
+        if (!ctx) {
+          reject(new Error('Could not get canvas context'));
+          return;
+        }
+        
+        // Draw white background
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        
+        ctx.drawImage(img, 0, 0);
+        
+        const pngUrl = canvas.toDataURL('image/png');
+        
+        if (download) {
+          this.downloadFile(pngUrl, fileName);
+        }
+        
+        URL.revokeObjectURL(url);
+        resolve(pngUrl);
+      };
+      
+      img.onerror = (e) => {
+        URL.revokeObjectURL(url);
+        reject(e);
+      };
+      
+      img.src = url;
+    });
+  }
+
+  private downloadFile(url: string, fileName: string): void {
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = fileName;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   }
 }
