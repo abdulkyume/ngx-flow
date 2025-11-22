@@ -36,10 +36,10 @@ export class App implements OnInit {
     ];
 
     this.edges = [
-      { id: 'e1-2', source: '1', target: '2', type: 'bezier' },
-      { id: 'e1-3', source: '1', target: '3', type: 'step' },
-      { id: 'e2-4', source: '2', target: '4', animated: true },
-      { id: 'e3-4', source: '3', target: '4', type: 'straight' }
+      { id: 'e1-2', source: '1', sourceHandle: 'right', target: '2', targetHandle: 'left', type: 'bezier' },
+      { id: 'e1-3', source: '1', sourceHandle: 'bottom', target: '3', targetHandle: 'top', type: 'step' },
+      { id: 'e2-4', source: '2', sourceHandle: 'right', target: '4', targetHandle: 'left', animated: true },
+      { id: 'e3-4', source: '3', sourceHandle: 'right', target: '4', targetHandle: 'bottom', type: 'straight' }
     ];
   }
 
