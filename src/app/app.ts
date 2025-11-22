@@ -36,10 +36,45 @@ export class App implements OnInit {
     ];
 
     this.edges = [
-      { id: 'e1-2', source: '1', sourceHandle: 'right', target: '2', targetHandle: 'left', type: 'bezier' },
-      { id: 'e1-3', source: '1', sourceHandle: 'bottom', target: '3', targetHandle: 'top', type: 'step' },
-      { id: 'e2-4', source: '2', sourceHandle: 'right', target: '4', targetHandle: 'left', animated: true },
-      { id: 'e3-4', source: '3', sourceHandle: 'right', target: '4', targetHandle: 'bottom', type: 'straight' }
+      { 
+        id: 'e1-2', 
+        source: '1', 
+        sourceHandle: 'right', 
+        target: '2', 
+        targetHandle: 'left', 
+        type: 'bezier',
+        label: 'processes',
+        markerEnd: 'arrowclosed'
+      },
+      { 
+        id: 'e1-3', 
+        source: '1', 
+        sourceHandle: 'bottom', 
+        target: '3', 
+        targetHandle: 'top', 
+        type: 'step',
+        label: 'alternate path',
+        markerEnd: 'arrow'
+      },
+      { 
+        id: 'e2-4', 
+        source: '2', 
+        sourceHandle: 'right', 
+        target: '4', 
+        targetHandle: 'left', 
+        animated: true,
+        label: 'completes',
+        markerEnd: 'arrowclosed'
+      },
+      { 
+        id: 'e3-4', 
+        source: '3', 
+        sourceHandle: 'right', 
+        target: '4', 
+        targetHandle: 'bottom', 
+        type: 'straight',
+        markerEnd: 'dot'
+      }
     ];
   }
 
@@ -72,18 +107,6 @@ export class App implements OnInit {
   // Event handlers
   onNodeClick(node: Node): void {
     console.log('Node clicked:', node);
-  }
-
-  onConnect(connection: { source: string; sourceHandle?: string; target: string; targetHandle?: string }): void {
-    const newEdge: Edge = {
-      id: uuidv4(),
-      source: connection.source,
-      sourceHandle: connection.sourceHandle,
-      target: connection.target,
-      targetHandle: connection.targetHandle,
-      type: 'bezier'
-    };
-    this.edges = [...this.edges, newEdge];
   }
 
   onNodesChange(nodes: Node[]): void {

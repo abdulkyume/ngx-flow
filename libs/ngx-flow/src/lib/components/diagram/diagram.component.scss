@@ -67,30 +67,64 @@
 }
 
 /* Edge Styles */
-.ngx-flow__edge-path {
-  stroke: var(--ngx-flow-edge-color, #b1b1b7);
-  stroke-width: 2;
-  fill: none;
-  pointer-events: none; /* Make path non-interactive to rely on hitbox */
+.ngx-flow__edge {
+  pointer-events: none;
+
+  &-path {
+    fill: none;
+    stroke: var(--ngx-flow-edge-stroke, #b1b1b7);
+    stroke-width: 1.5;
+    pointer-events: none;
+  }
+
+  &-hitbox {
+    fill: none;
+    stroke: transparent;
+    stroke-width: 20;
+    pointer-events: all;
+    cursor: pointer;
+  }
+
+  &.selected .ngx-flow__edge-path {
+    stroke: var(--ngx-flow-edge-stroke-selected, #555);
+    stroke-width: 2.5;
+  }
+
+  &:hover .ngx-flow__edge-path {
+    stroke: var(--ngx-flow-edge-stroke-hover, #777);
+  }
+
+  &.animated .ngx-flow__edge-path {
+    stroke-dasharray: 5;
+    animation: dashdraw 0.5s linear infinite;
+  }
 }
 
-.ngx-flow__edge-hitbox {
-  stroke: transparent;
-  stroke-width: 20; /* Invisible wider path for easier clicking */
-  fill: none;
-  cursor: pointer;
-  stroke-linecap: round;
+/* Edge Labels */
+.ngx-flow__edge-label {
+  pointer-events: none;
+  user-select: none;
+
+  &-text {
+    font-family: sans-serif;
+    font-size: 12px;
+    fill: var(--ngx-flow-edge-label-color, #333);
+    background: var(--ngx-flow-edge-label-bg, #fff);
+    padding: 2px 4px;
+  }
+
+  &-bg {
+    fill: var(--ngx-flow-edge-label-bg, #fff);
+    stroke: var(--ngx-flow-edge-label-border, #ddd);
+    stroke-width: 1;
+  }
 }
 
-.ngx-flow__edge.selected .ngx-flow__edge-path {
-  stroke: var(--ngx-flow-selection-color, #1a192b);
+@keyframes dashdraw {
+  to {
+    stroke-dashoffset: -10;
+  }
 }
-
-.ngx-flow__edge.animated .ngx-flow__edge-path {
-  stroke-dasharray: 5 5;
-  animation: dash 1s linear infinite;
-}
-
 @keyframes dash {
   to {
     stroke-dashoffset: -100;

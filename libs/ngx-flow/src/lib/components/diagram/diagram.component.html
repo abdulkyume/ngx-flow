@@ -18,6 +18,45 @@
     >
       <circle cx="0.5" cy="0.5" r="0.5" fill="#ccc" />
     </pattern>
+
+    <!-- Edge Markers -->
+    <!-- Arrow marker -->
+    <marker
+      id="ngx-flow__arrow"
+      viewBox="0 0 10 10"
+      refX="9"
+      refY="5"
+      markerWidth="6"
+      markerHeight="6"
+      orient="auto-start-reverse"
+    >
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="context-stroke" />
+    </marker>
+
+    <!-- Arrowclosed marker (filled) -->
+    <marker
+      id="ngx-flow__arrowclosed"
+      viewBox="0 0 10 10"
+      refX="10"
+      refY="5"
+      markerWidth="6"
+      markerHeight="6"
+      orient="auto-start-reverse"
+    >
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="context-stroke" stroke="context-stroke" />
+    </marker>
+
+    <!-- Dot marker -->
+    <marker
+      id="ngx-flow__dot"
+      viewBox="0 0 10 10"
+      refX="5"
+      refY="5"
+      markerWidth="6"
+      markerHeight="6"
+    >
+      <circle cx="5" cy="5" r="4" fill="context-stroke" />
+    </marker>
   </defs>
 
   <rect
@@ -34,8 +73,36 @@
        [class.animated]="edge.animated"
        class="ngx-flow__edge"
        (click)="onEdgeClick($event, edge)">
-      <path [attr.d]="getEdgePath(edge)" class="ngx-flow__edge-path" [style]="edge.style"></path>
+      <!-- Edge path with markers -->
+      <path 
+        [attr.d]="getEdgePath(edge)" 
+        class="ngx-flow__edge-path" 
+        [style]="edge.style"
+        [attr.marker-start]="getMarkerUrl(edge.markerStart)"
+        [attr.marker-end]="getMarkerUrl(edge.markerEnd)"
+      ></path>
+      <!-- Invisible hitbox for easier clicking -->
       <path [attr.d]="getEdgePath(edge)" class="ngx-flow__edge-hitbox"></path>
+      
+      <!-- Edge label -->
+      <g *ngIf="edge.label" class="ngx-flow__edge-label">
+        <text 
+          [attr.x]="getEdgeLabelPosition(edge).x" 
+          [attr.y]="getEdgeLabelPosition(edge).y"
+          text-anchor="middle"
+          dominant-baseline="middle"
+          class="ngx-flow__edge-label-text"
+          [style]="edge.labelStyle"
+        >
+          <!-- Label background -->
+          <tspan 
+            *ngIf="edge.labelBgStyle"
+            class="ngx-flow__edge-label-bg"
+            [style]="edge.labelBgStyle"
+          ></tspan>
+          {{ edge.label }}
+        </text>
+      </g>
     </g>
 
     <!-- Render temporary edges (previews) -->

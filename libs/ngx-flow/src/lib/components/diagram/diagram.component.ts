@@ -568,11 +568,55 @@ export class DiagramComponent implements OnInit, OnDestroy, OnChanges {
     }
   }
 
+  getMarkerUrl(marker: string | undefined): string | null {
+    if (!marker) return null;
+    // Support built-in markers or custom marker IDs
+    if (marker === 'arrow' || marker === 'arrowclosed' || marker === 'dot') {
+      return `url(#ngx-flow__${marker})`;
+    }
+    return `url(#${marker})`;
+  }
+
+  getEdgeLabelPosition(edge: Edge): XYPosition {
+    const nodes = this.nodes();
+    const sourceNode = getNode(edge.source, nodes);
+    const targetNode = getNode(edge.target, nodes);
+
+    if (!sourceNode || !targetNode) {
+      return { x: 0, y: 0 };
+    }
+
+    const sourcePos = getHandleAbsolutePosition(sourceNode, edge.sourceHandle);
+    const targetPos = getHandleAbsolutePosition(targetNode, edge.targetHandle);
+
+    // Return midpoint of the edge
+    return {
+      x: (sourcePos.x + targetPos.x) / 2,
+      y: (sourcePos.y + targetPos.y) / 2
+    };
+  }
+
   onEdgeClick(event: MouseEvent, edge: Edge): void {
       event.stopPropagation();
+      event.preventDefault();
+      
       this.diagramStateService.onEdgeClick(edge);
+      
+      const isMultiSelect = event.ctrlKey || event.metaKey || event.shiftKey;
+      
+      // Clear node selection when selecting edges
+      this.diagramStateService.nodes.update(nodes =>
+        nodes.map(n => ({ ...n, selected: false }))
+      );
+      
+      // Toggle edge selection
       this.diagramStateService.edges.update(edges =>
-        edges.map(e => ({ ...e, selected: e.id === edge.id ? !e.selected : e.selected }))
+        edges.map(e => ({ 
+          ...e, 
+          selected: e.id === edge.id 
+            ? !e.selected 
+            : (isMultiSelect ? e.selected : false)
+        }))
       );
   }
 

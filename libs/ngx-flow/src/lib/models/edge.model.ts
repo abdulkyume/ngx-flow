@@ -1,15 +1,31 @@
-export interface Edge {
+export type MarkerType = 'arrow' | 'arrowclosed' | 'dot';
+
+export interface Edge<T = any> {
   id: string;
   source: string; // source node id
   target: string; // target node id
   sourceHandle?: string;
   targetHandle?: string;
-  type?: string; // Corresponds to a key in the edge types registry
+  type?: 'bezier' | 'straight' | 'step' | 'smoothstep';
   animated?: boolean;
+  style?: { [key: string]: any };
+  
+  // Selection
   selected?: boolean;
-  data?: any;
-  class?: string;
-  style?: Record<string, string>;
+  
+  // Labels
+  label?: string;
+  labelStyle?: { [key: string]: any };
+  labelBgStyle?: { [key: string]: any };
+  labelBgPadding?: [number, number]; // [x, y] padding
+  labelBgBorderRadius?: number;
+  
+  // Markers (arrows, dots)
+  markerStart?: MarkerType | string;
+  markerEnd?: MarkerType | string;
+  
+  // Custom data
+  data?: T;
 }
 
 export interface TempEdge extends Edge {
