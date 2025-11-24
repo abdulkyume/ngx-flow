@@ -20,6 +20,11 @@ export interface Node<T = any> {
   selected?: boolean;
   dragging?: boolean;
   draggable?: boolean;
+  resizable?: boolean;
+  minWidth?: number;
+  minHeight?: number;
+  maxWidth?: number;
+  maxHeight?: number;
   class?: string;
   style?: Record<string, string>;
 }

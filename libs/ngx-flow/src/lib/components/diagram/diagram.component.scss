@@ -171,3 +171,27 @@
     stroke: var(--ngx-flow-handle-valid-target-border, #007f00);
   }
 }
+
+/* Resize Handle Styles */
+.ngx-flow__resize-handle {
+  fill: var(--ngx-flow-resize-handle-bg, #fff);
+  stroke: var(--ngx-flow-resize-handle-border, #1a192b);
+  stroke-width: 1;
+  pointer-events: all;
+
+  &[data-handle='nw'] {
+    cursor: nw-resize;
+  }
+
+  &[data-handle='ne'] {
+    cursor: ne-resize;
+  }
+
+  &[data-handle='sw'] {
+    cursor: sw-resize;
+  }
+
+  &[data-handle='se'] {
+    cursor: se-resize;
+  }
+}

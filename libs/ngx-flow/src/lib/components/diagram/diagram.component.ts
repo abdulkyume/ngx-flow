@@ -115,12 +115,22 @@ export class DiagramComponent implements OnInit, OnDestroy, OnChanges {
   private connectingSourceNodeId: string | null = null;
   private connectingSourceHandleId: string | undefined = undefined;
 
+  // Resizing
+  private isResizing = false;
+  private resizingNode: Node | null = null;
+  private resizeHandle: 'nw' | 'ne' | 'sw' | 'se' | null = null;
+  private startResizePosition: XYPosition = { x: 0, y: 0 };
+  private startNodeDimensions: { width: number; height: number; x: number; y: number } = { width: 0, height: 0, x: 0, y: 0 };
+
   // Default node dimensions
   defaultNodeWidth = 170;
   defaultNodeHeight = 60;
 
   // Input for custom connection validation (optional)
   @Input() connectionValidator?: (sourceNodeId: string, targetNodeId: string) => boolean;
+  // Input for node resizing (global toggle)
+  @Input() nodesResizable: boolean = true;
+
 
   // Helper to check if a connection is allowed
   private isValidConnection(sourceId: string, targetId: string): boolean {
@@ -142,7 +152,7 @@ export class DiagramComponent implements OnInit, OnDestroy, OnChanges {
     private ngZone: NgZone,
     private diagramStateService: DiagramStateService,
     @Optional() @Inject(NGX_FLOW_NODE_TYPES) private nodeTypes: Record<string, NodeComponentType> | null
-  ) {}
+  ) { }
 
   ngOnInit(): void {
     this.diagramStateService.el = this.svgRef;
@@ -189,14 +199,14 @@ export class DiagramComponent implements OnInit, OnDestroy, OnChanges {
       const currentNodes = this.nodes();
       const currentNodeIds = new Set(currentNodes.map(n => n.id));
       const newNodeIds = new Set(this.initialNodes.map(n => n.id));
-      
+
       // Remove nodes that are no longer in initialNodes
       currentNodes.forEach(node => {
         if (!newNodeIds.has(node.id)) {
           this.diagramStateService.removeNode(node.id);
         }
       });
-      
+
       // Add or update nodes from initialNodes
       this.initialNodes.forEach(node => {
         if (!currentNodeIds.has(node.id)) {
@@ -280,66 +290,85 @@ export class DiagramComponent implements OnInit, OnDestroy, OnChanges {
   onPointerDown(event: PointerEvent): void {
     let targetElement = event.target as Element;
 
+    // Check for resize handle first (highest priority)
+    const resizeHandleElement = targetElement.closest('.ngx-flow__resize-handle') as HTMLElement;
+    if (resizeHandleElement) {
+      const nodeElement = resizeHandleElement.closest('.ngx-flow__node') as HTMLElement;
+      if (nodeElement) {
+        const nodeId = nodeElement.dataset['id'];
+        const node = this.nodes().find(n => n.id === nodeId);
+        const handle = resizeHandleElement.dataset['handle'] as 'nw' | 'ne' | 'sw' | 'se';
+        if (node && handle && (node.resizable !== false) && this.nodesResizable) {
+          this.startResizing(event, node, handle);
+          return;
+        }
+      }
+    }
+
     let handleElement = targetElement.closest('.ngx-flow__handle') as HTMLElement;
     const nodeElement = targetElement.closest('.ngx-flow__node') as HTMLElement;
 
     if (event.button !== 0) return;
 
     if (handleElement && handleElement.dataset['type'] === 'source') {
-        // Start Connecting
-        this.startConnecting(event, handleElement);
+      // Start Connecting
+      this.startConnecting(event, handleElement);
     } else if (nodeElement) {
-        // Start Dragging Node
-        const nodeId = nodeElement.dataset['id'];
-        const node = this.nodes().find(n => n.id === nodeId);
-        if (node && node.draggable) {
-            this.startDraggingNode(event, node);
-        }
-        // Select Node
-        if (node) {
-             this.diagramStateService.onNodeClick(node);
-             this.diagramStateService.selectNodes([node.id], event.ctrlKey || event.metaKey || event.shiftKey);
-        }
+      // Start Dragging Node
+      const nodeId = nodeElement.dataset['id'];
+      const node = this.nodes().find(n => n.id === nodeId);
+      if (node && node.draggable) {
+        this.startDraggingNode(event, node);
+      }
+      // Select Node
+      if (node) {
+        this.diagramStateService.onNodeClick(node);
+        this.diagramStateService.selectNodes([node.id], event.ctrlKey || event.metaKey || event.shiftKey);
+      }
     } else {
-        // Pan or Select
-         const isClickingOnCanvas = targetElement === this.svgRef.nativeElement || targetElement.classList.contains('ngx-flow__background');
-         if (isClickingOnCanvas) {
-            if (event.shiftKey) {
-                this.startSelecting(event);
-            } else {
-                this.startPanning(event);
-            }
-         }
+      // Pan or Select
+      const isClickingOnCanvas = targetElement === this.svgRef.nativeElement || targetElement.classList.contains('ngx-flow__background');
+      if (isClickingOnCanvas) {
+        if (event.shiftKey) {
+          this.startSelecting(event);
+        } else {
+          this.startPanning(event);
+        }
+      }
     }
   }
 
   onPointerMove(event: PointerEvent): void {
-    // console.log('onPointerMove', { dragging: this.isDraggingNode, connecting: this.isConnecting });
-    if (this.isConnecting) {
-        this.updateConnection(event);
+    // console.log('onPointerMove', { dragging: this.isDraggingNode, connecting: this.isConnecting, resizing: this.isResizing });
+    if (this.isResizing) {
+      this.resize(event);
+    } else if (this.isConnecting) {
+      this.updateConnection(event);
     } else if (this.isDraggingNode) {
-        this.dragNode(event);
+      this.dragNode(event);
     } else if (this.isPanning) {
-        this.pan(event);
+      this.pan(event);
     } else if (this.isSelecting) {
-        this.updateSelection(event);
+      this.updateSelection(event);
     }
   }
 
   onPointerUp(event: PointerEvent): void {
-    if (this.isConnecting) {
-        this.finishConnecting(event);
+    if (this.isResizing) {
+      this.stopResizing(event);
+    } else if (this.isConnecting) {
+      this.finishConnecting(event);
     } else if (this.isDraggingNode) {
-        this.stopDraggingNode(event);
+      this.stopDraggingNode(event);
     } else if (this.isPanning) {
-        this.stopPanning(event);
+      this.stopPanning(event);
     } else if (this.isSelecting) {
-        this.stopSelecting(event);
+      this.stopSelecting(event);
     }
   }
 
   onPointerLeave(event: PointerEvent): void {
-    if (this.isPanning || this.isSelecting || this.isDraggingNode || this.isConnecting) {
+    if (this.isResizing || this.isPanning || this.isSelecting || this.isDraggingNode || this.isConnecting) {
       this.onPointerUp(event);
     }
   }
@@ -347,125 +376,125 @@ export class DiagramComponent implements OnInit, OnDestroy, OnChanges {
   // --- Connecting Logic ---
 
   private startConnecting(event: PointerEvent, handleElement: HTMLElement): void {
-      event.stopPropagation();
-      event.preventDefault();
+    event.stopPropagation();
+    event.preventDefault();
 
-      this.isConnecting = true;
-      this.svgRef.nativeElement.setPointerCapture(event.pointerId);
+    this.isConnecting = true;
+    this.svgRef.nativeElement.setPointerCapture(event.pointerId);
 
-      const nodeId = handleElement.dataset['nodeid'];
-      const handleId = handleElement.dataset['handleid'];
+    const nodeId = handleElement.dataset['nodeid'];
+    const handleId = handleElement.dataset['handleid'];
 
-      if (!nodeId) return;
+    if (!nodeId) return;
 
-      this.connectingSourceNodeId = nodeId;
-      this.connectingSourceHandleId = handleId;
+    this.connectingSourceNodeId = nodeId;
+    this.connectingSourceHandleId = handleId;
 
-      const previewEdgeId = `preview-${uuidv4()}`;
-      this.currentPreviewEdgeId = previewEdgeId;
+    const previewEdgeId = `preview-${uuidv4()}`;
+    this.currentPreviewEdgeId = previewEdgeId;
 
-      const viewport = this.viewport();
-      const diagramSvgEl = this.svgRef.nativeElement;
-      const handleScreenCoords = handleElement.getBoundingClientRect();
-      const diagramScreenCoords = diagramSvgEl.getBoundingClientRect();
+    const viewport = this.viewport();
+    const diagramSvgEl = this.svgRef.nativeElement;
+    const handleScreenCoords = handleElement.getBoundingClientRect();
+    const diagramScreenCoords = diagramSvgEl.getBoundingClientRect();
 
-      const sourceX = (handleScreenCoords.x + handleScreenCoords.width / 2 - diagramScreenCoords.x - viewport.x) / viewport.zoom;
-      const sourceY = (handleScreenCoords.y + handleScreenCoords.height / 2 - diagramScreenCoords.y - viewport.y) / viewport.zoom;
+    const sourceX = (handleScreenCoords.x + handleScreenCoords.width / 2 - diagramScreenCoords.x - viewport.x) / viewport.zoom;
+    const sourceY = (handleScreenCoords.y + handleScreenCoords.height / 2 - diagramScreenCoords.y - viewport.y) / viewport.zoom;
 
-      const newTempEdge: TempEdge = {
-        id: previewEdgeId,
-        source: nodeId,
-        sourceHandle: handleId,
-        target: 'preview-target',
-        targetHandle: undefined,
-        type: 'straight',
-        animated: true,
-        style: { stroke: 'blue', strokeWidth: '2' },
-        sourceX: sourceX,
-        sourceY: sourceY,
-        targetX: sourceX,
-        targetY: sourceY,
-      };
-      this.diagramStateService.addTempEdge(newTempEdge);
+    const newTempEdge: TempEdge = {
+      id: previewEdgeId,
+      source: nodeId,
+      sourceHandle: handleId,
+      target: 'preview-target',
+      targetHandle: undefined,
+      type: 'straight',
+      animated: true,
+      style: { stroke: 'blue', strokeWidth: '2' },
+      sourceX: sourceX,
+      sourceY: sourceY,
+      targetX: sourceX,
+      targetY: sourceY,
+    };
+    this.diagramStateService.addTempEdge(newTempEdge);
   }
 
   private updateConnection(event: PointerEvent): void {
-      if (!this.currentPreviewEdgeId) return;
+    if (!this.currentPreviewEdgeId) return;
 
-      this.ngZone.runOutsideAngular(() => {
-        const diagramSvgEl = this.svgRef.nativeElement;
-        const diagramScreenCoords = diagramSvgEl.getBoundingClientRect();
-        const viewport = this.viewport();
+    this.ngZone.runOutsideAngular(() => {
+      const diagramSvgEl = this.svgRef.nativeElement;
+      const diagramScreenCoords = diagramSvgEl.getBoundingClientRect();
+      const viewport = this.viewport();
 
-        const currentPointerX = (event.clientX - diagramScreenCoords.x - viewport.x) / viewport.zoom;
-        const currentPointerY = (event.clientY - diagramScreenCoords.y - viewport.y) / viewport.zoom;
+      const currentPointerX = (event.clientX - diagramScreenCoords.x - viewport.x) / viewport.zoom;
+      const currentPointerY = (event.clientY - diagramScreenCoords.y - viewport.y) / viewport.zoom;
 
-        this.diagramStateService.updateTempEdgeTarget(this.currentPreviewEdgeId!, { x: currentPointerX, y: currentPointerY });
+      this.diagramStateService.updateTempEdgeTarget(this.currentPreviewEdgeId!, { x: currentPointerX, y: currentPointerY });
 
-        // Use elementFromPoint to find what's actually under the mouse
-        // because setPointerCapture causes event.target to always be the captured element
-        const elementUnderMouse = document.elementFromPoint(event.clientX, event.clientY);
-        const closestHandle = elementUnderMouse?.closest('.ngx-flow__handle') as HTMLElement;
+      // Use elementFromPoint to find what's actually under the mouse
+      // because setPointerCapture causes event.target to always be the captured element
+      const elementUnderMouse = document.elementFromPoint(event.clientX, event.clientY);
+      const closestHandle = elementUnderMouse?.closest('.ngx-flow__handle') as HTMLElement;
 
-        this.clearTargetHandleHighlight();
+      this.clearTargetHandleHighlight();
 
-        if (closestHandle) {
-          const targetNodeId = closestHandle.dataset['nodeid'];
-          const targetHandleId = closestHandle.dataset['handleid'];
+      if (closestHandle) {
+        const targetNodeId = closestHandle.dataset['nodeid'];
+        const targetHandleId = closestHandle.dataset['handleid'];
 
-          // Allow connecting to any handle on a different node
-          if (targetNodeId && this.isValidConnection(this.connectingSourceNodeId!, targetNodeId)) {
-            this.currentTargetHandle = { nodeId: targetNodeId, handleId: targetHandleId, type: 'target' };
-            this.renderer.addClass(closestHandle, 'ngx-flow__handle--valid-target');
-          } else {
-            this.currentTargetHandle = null;
-          }
+        // Allow connecting to any handle on a different node
+        if (targetNodeId && this.isValidConnection(this.connectingSourceNodeId!, targetNodeId)) {
+          this.currentTargetHandle = { nodeId: targetNodeId, handleId: targetHandleId, type: 'target' };
+          this.renderer.addClass(closestHandle, 'ngx-flow__handle--valid-target');
         } else {
           this.currentTargetHandle = null;
         }
-      });
+      } else {
+        this.currentTargetHandle = null;
+      }
+    });
   }
 
   private finishConnecting(event: PointerEvent): void {
-      event.stopPropagation();
-      event.preventDefault();
+    event.stopPropagation();
+    event.preventDefault();
 
-      this.isConnecting = false;
-      this.svgRef.nativeElement.releasePointerCapture(event.pointerId);
-      this.clearTargetHandleHighlight();
+    this.isConnecting = false;
+    this.svgRef.nativeElement.releasePointerCapture(event.pointerId);
+    this.clearTargetHandleHighlight();
 
-      if (this.currentPreviewEdgeId) {
-          this.diagramStateService.removeEdge(this.currentPreviewEdgeId);
-      }
+    if (this.currentPreviewEdgeId) {
+      this.diagramStateService.removeEdge(this.currentPreviewEdgeId);
+    }
 
-      if (this.currentTargetHandle && this.connectingSourceNodeId) {
-        const sourceId = this.connectingSourceNodeId;
-        const targetId = this.currentTargetHandle.nodeId;
+    if (this.currentTargetHandle && this.connectingSourceNodeId) {
+      const sourceId = this.connectingSourceNodeId;
+      const targetId = this.currentTargetHandle.nodeId;
 
-        if (this.isValidConnection(sourceId, targetId)) {
-          const newEdge: Edge = {
-            id: uuidv4(),
-            source: sourceId,
-            sourceHandle: this.connectingSourceHandleId,
-            target: targetId,
-            targetHandle: this.currentTargetHandle.handleId,
-            type: 'bezier',
-          };
-          this.diagramStateService.addEdge(newEdge);
-        } else {
-          // Visual feedback for invalid connection: flash source node
-          const sourceNodeEl = this.el.nativeElement.querySelector(`[data-nodeid="${sourceId}"]`);
-          if (sourceNodeEl) {
-            this.renderer.addClass(sourceNodeEl, 'invalid-connection');
-            setTimeout(() => this.renderer.removeClass(sourceNodeEl, 'invalid-connection'), 1000);
-          }
+      if (this.isValidConnection(sourceId, targetId)) {
+        const newEdge: Edge = {
+          id: uuidv4(),
+          source: sourceId,
+          sourceHandle: this.connectingSourceHandleId,
+          target: targetId,
+          targetHandle: this.currentTargetHandle.handleId,
+          type: 'bezier',
+        };
+        this.diagramStateService.addEdge(newEdge);
+      } else {
+        // Visual feedback for invalid connection: flash source node
+        const sourceNodeEl = this.el.nativeElement.querySelector(`[data-nodeid="${sourceId}"]`);
+        if (sourceNodeEl) {
+          this.renderer.addClass(sourceNodeEl, 'invalid-connection');
+          setTimeout(() => this.renderer.removeClass(sourceNodeEl, 'invalid-connection'), 1000);
         }
       }
+    }
 
-      this.currentPreviewEdgeId = null;
-      this.currentTargetHandle = null;
-      this.connectingSourceNodeId = null;
-      this.connectingSourceHandleId = undefined;
+    this.currentPreviewEdgeId = null;
+    this.currentTargetHandle = null;
+    this.connectingSourceNodeId = null;
+    this.connectingSourceHandleId = undefined;
   }
 
   private clearTargetHandleHighlight(): void {
@@ -476,92 +505,186 @@ export class DiagramComponent implements OnInit, OnDestroy, OnChanges {
   // --- Dragging Logic ---
 
   private startDraggingNode(event: PointerEvent, node: Node): void {
-      event.stopPropagation();
-      this.isDraggingNode = true;
-      this.draggingNode = node;
-      this.startNodePosition = { x: node.position.x, y: node.position.y };
-      this.startPointerPosition = { x: event.clientX, y: event.clientY };
-      this.svgRef.nativeElement.setPointerCapture(event.pointerId);
-      this.diagramStateService.onDragStart(node);
+    event.stopPropagation();
+    this.isDraggingNode = true;
+    this.draggingNode = node;
+    this.startNodePosition = { x: node.position.x, y: node.position.y };
+    this.startPointerPosition = { x: event.clientX, y: event.clientY };
+    this.svgRef.nativeElement.setPointerCapture(event.pointerId);
+    this.diagramStateService.onDragStart(node);
   }
 
   private dragNode(event: PointerEvent): void {
-      if (!this.draggingNode) return;
-      event.stopPropagation();
+    if (!this.draggingNode) return;
+    event.stopPropagation();
 
-      this.ngZone.runOutsideAngular(() => {
-        const zoom = this.viewport().zoom;
-        const deltaX = (event.clientX - this.startPointerPosition.x) / zoom;
-        const deltaY = (event.clientY - this.startPointerPosition.y) / zoom;
+    this.ngZone.runOutsideAngular(() => {
+      const zoom = this.viewport().zoom;
+      const deltaX = (event.clientX - this.startPointerPosition.x) / zoom;
+      const deltaY = (event.clientY - this.startPointerPosition.y) / zoom;
 
-        const newPosition = {
-          x: this.startNodePosition.x + deltaX,
-          y: this.startNodePosition.y + deltaY,
-        };
-        this.diagramStateService.moveNode(this.draggingNode!.id, newPosition);
-      });
+      const newPosition = {
+        x: this.startNodePosition.x + deltaX,
+        y: this.startNodePosition.y + deltaY,
+      };
+      this.diagramStateService.moveNode(this.draggingNode!.id, newPosition);
+    });
   }
 
   private stopDraggingNode(event: PointerEvent): void {
-      if (!this.draggingNode) return;
-      event.stopPropagation();
-      this.isDraggingNode = false;
-      this.svgRef.nativeElement.releasePointerCapture(event.pointerId);
-      this.diagramStateService.onDragEnd(this.draggingNode);
-      this.draggingNode = null;
+    if (!this.draggingNode) return;
+    event.stopPropagation();
+    this.isDraggingNode = false;
+    this.svgRef.nativeElement.releasePointerCapture(event.pointerId);
+    this.diagramStateService.onDragEnd(this.draggingNode);
+    this.draggingNode = null;
   }
+
+  // --- Resizing Logic ---
+
+  private startResizing(event: PointerEvent, node: Node, handle: 'nw' | 'ne' | 'sw' | 'se'): void {
+    event.stopPropagation();
+    this.isResizing = true;
+    this.resizingNode = node;
+    this.resizeHandle = handle;
+    this.startResizePosition = { x: event.clientX, y: event.clientY };
+    this.startNodeDimensions = {
+      width: node.width || this.defaultNodeWidth,
+      height: node.height || this.defaultNodeHeight,
+      x: node.position.x,
+      y: node.position.y
+    };
+    this.svgRef.nativeElement.setPointerCapture(event.pointerId);
+    this.diagramStateService.onResizeStart(node);
+  }
+
+  private resize(event: PointerEvent): void {
+    if (!this.resizingNode || !this.resizeHandle) return;
+    event.stopPropagation();
+
+    const resizingNode = this.resizingNode;
+    const resizeHandle = this.resizeHandle;
+
+    this.ngZone.runOutsideAngular(() => {
+      const zoom = this.viewport().zoom;
+      const deltaX = (event.clientX - this.startResizePosition.x) / zoom;
+      const deltaY = (event.clientY - this.startResizePosition.y) / zoom;
+
+      let newWidth = this.startNodeDimensions.width;
+      let newHeight = this.startNodeDimensions.height;
+      let newX = this.startNodeDimensions.x;
+      let newY = this.startNodeDimensions.y;
+
+      // Calculate new dimensions based on handle
+      switch (resizeHandle) {
+        case 'se': // Southeast - resize from bottom-right
+          newWidth = this.startNodeDimensions.width + deltaX;
+          newHeight = this.startNodeDimensions.height + deltaY;
+          break;
+        case 'sw': // Southwest - resize from bottom-left
+          newWidth = this.startNodeDimensions.width - deltaX;
+          newHeight = this.startNodeDimensions.height + deltaY;
+          newX = this.startNodeDimensions.x + deltaX;
+          break;
+        case 'ne': // Northeast - resize from top-right
+          newWidth = this.startNodeDimensions.width + deltaX;
+          newHeight = this.startNodeDimensions.height - deltaY;
+          newY = this.startNodeDimensions.y + deltaY;
+          break;
+        case 'nw': // Northwest - resize from top-left
+          newWidth = this.startNodeDimensions.width - deltaX;
+          newHeight = this.startNodeDimensions.height - deltaY;
+          newX = this.startNodeDimensions.x + deltaX;
+          newY = this.startNodeDimensions.y + deltaY;
+          break;
+      }
+
+      // Apply constraints
+      const minWidth = resizingNode.minWidth || 50;
+      const minHeight = resizingNode.minHeight || 30;
+      const maxWidth = resizingNode.maxWidth || 500;
+      const maxHeight = resizingNode.maxHeight || 500;
+
+      newWidth = Math.max(minWidth, Math.min(maxWidth, newWidth));
+      newHeight = Math.max(minHeight, Math.min(maxHeight, newHeight));
+
+      // Adjust position if constrained (for nw, ne, sw handles)
+      if (resizeHandle === 'nw' || resizeHandle === 'sw') {
+        const widthDiff = newWidth - (this.startNodeDimensions.width - deltaX);
+        newX = this.startNodeDimensions.x + deltaX - widthDiff;
+      }
+      if (resizeHandle === 'nw' || resizeHandle === 'ne') {
+        const heightDiff = newHeight - (this.startNodeDimensions.height - deltaY);
+        newY = this.startNodeDimensions.y + deltaY - heightDiff;
+      }
+
+      // Update node
+      this.diagramStateService.resizeNode(resizingNode.id, newWidth, newHeight, { x: newX, y: newY });
+    });
+  }
+
+  private stopResizing(event: PointerEvent): void {
+    if (!this.resizingNode) return;
+    event.stopPropagation();
+    this.isResizing = false;
+    this.svgRef.nativeElement.releasePointerCapture(event.pointerId);
+    this.diagramStateService.onResizeEnd(this.resizingNode);
+    this.resizingNode = null;
+    this.resizeHandle = null;
+  }
+
 
   // --- Panning Logic ---
 
   private startPanning(event: PointerEvent): void {
-      this.isPanning = true;
-      this.lastPanPosition = { x: event.clientX, y: event.clientY };
-      this.renderer.setStyle(this.svgRef.nativeElement, 'cursor', 'grabbing');
-      this.svgRef.nativeElement.setPointerCapture(event.pointerId);
-      this.diagramStateService.clearSelection();
+    this.isPanning = true;
+    this.lastPanPosition = { x: event.clientX, y: event.clientY };
+    this.renderer.setStyle(this.svgRef.nativeElement, 'cursor', 'grabbing');
+    this.svgRef.nativeElement.setPointerCapture(event.pointerId);
+    this.diagramStateService.clearSelection();
   }
 
   private pan(event: PointerEvent): void {
-      this.ngZone.runOutsideAngular(() => {
-        const deltaX = event.clientX - this.lastPanPosition.x;
-        const deltaY = event.clientY - this.lastPanPosition.y;
+    this.ngZone.runOutsideAngular(() => {
+      const deltaX = event.clientX - this.lastPanPosition.x;
+      const deltaY = event.clientY - this.lastPanPosition.y;
 
-        const currentViewport = this.viewport();
-        this.diagramStateService.setViewport({
-          x: currentViewport.x + deltaX,
-          y: currentViewport.y + deltaY,
-          zoom: currentViewport.zoom,
-        });
-
-        this.lastPanPosition = { x: event.clientX, y: event.clientY };
+      const currentViewport = this.viewport();
+      this.diagramStateService.setViewport({
+        x: currentViewport.x + deltaX,
+        y: currentViewport.y + deltaY,
+        zoom: currentViewport.zoom,
       });
+
+      this.lastPanPosition = { x: event.clientX, y: event.clientY };
+    });
   }
 
   private stopPanning(event: PointerEvent): void {
-      this.isPanning = false;
-      this.renderer.setStyle(this.svgRef.nativeElement, 'cursor', 'grab');
-      this.svgRef.nativeElement.releasePointerCapture(event.pointerId);
+    this.isPanning = false;
+    this.renderer.setStyle(this.svgRef.nativeElement, 'cursor', 'grab');
+    this.svgRef.nativeElement.releasePointerCapture(event.pointerId);
   }
 
   // --- Selection Logic ---
 
   private startSelecting(event: PointerEvent): void {
-      this.isSelecting = true;
-      this.selectionStart = this.getDiagramCoordinates(event.clientX, event.clientY);
-      this.selectionEnd = { ...this.selectionStart };
-      this.svgRef.nativeElement.setPointerCapture(event.pointerId);
+    this.isSelecting = true;
+    this.selectionStart = this.getDiagramCoordinates(event.clientX, event.clientY);
+    this.selectionEnd = { ...this.selectionStart };
+    this.svgRef.nativeElement.setPointerCapture(event.pointerId);
   }
 
   private updateSelection(event: PointerEvent): void {
-      this.ngZone.runOutsideAngular(() => {
-        this.selectionEnd = this.getDiagramCoordinates(event.clientX, event.clientY);
-      });
+    this.ngZone.runOutsideAngular(() => {
+      this.selectionEnd = this.getDiagramCoordinates(event.clientX, event.clientY);
+    });
   }
 
   private stopSelecting(event: PointerEvent): void {
-      this.isSelecting = false;
-      this.svgRef.nativeElement.releasePointerCapture(event.pointerId);
-      this.performLassoSelection();
+    this.isSelecting = false;
+    this.svgRef.nativeElement.releasePointerCapture(event.pointerId);
+    this.performLassoSelection();
   }
 
   private getDiagramCoordinates(clientX: number, clientY: number): XYPosition {
@@ -659,36 +782,36 @@ export class DiagramComponent implements OnInit, OnDestroy, OnChanges {
   }
 
   onEdgeClick(event: MouseEvent, edge: Edge): void {
-      event.stopPropagation();
-      event.preventDefault();
-      
-      this.diagramStateService.onEdgeClick(edge);
-      
-      const isMultiSelect = event.ctrlKey || event.metaKey || event.shiftKey;
-      
-      // Clear node selection when selecting edges
-      this.diagramStateService.nodes.update(nodes =>
-        nodes.map(n => ({ ...n, selected: false }))
-      );
-      
-      // Toggle edge selection
-      this.diagramStateService.edges.update(edges =>
-        edges.map(e => ({ 
-          ...e, 
-          selected: e.id === edge.id 
-            ? !e.selected 
-            : (isMultiSelect ? e.selected : false)
-        }))
-      );
+    event.stopPropagation();
+    event.preventDefault();
+
+    this.diagramStateService.onEdgeClick(edge);
+
+    const isMultiSelect = event.ctrlKey || event.metaKey || event.shiftKey;
+
+    // Clear node selection when selecting edges
+    this.diagramStateService.nodes.update(nodes =>
+      nodes.map(n => ({ ...n, selected: false }))
+    );
+
+    // Toggle edge selection
+    this.diagramStateService.edges.update(edges =>
+      edges.map(e => ({
+        ...e,
+        selected: e.id === edge.id
+          ? !e.selected
+          : (isMultiSelect ? e.selected : false)
+      }))
+    );
   }
 
   // --- Node Logic ---
 
   getCustomNodeComponent(type: string | undefined): NodeComponentType | null {
-      if (type && this.nodeTypes && this.nodeTypes[type]) {
-          return this.nodeTypes[type];
-      }
-      return null;
+    if (type && this.nodeTypes && this.nodeTypes[type]) {
+      return this.nodeTypes[type];
+    }
+    return null;
   }
 
   zoomIn(): void {
@@ -730,7 +853,7 @@ export class DiagramComponent implements OnInit, OnDestroy, OnChanges {
     nodes.forEach(node => {
       const width = node.width || this.defaultNodeWidth;
       const height = node.height || this.defaultNodeHeight;
-      
+
       minX = Math.min(minX, node.position.x);
       minY = Math.min(minY, node.position.y);
       maxX = Math.max(maxX, node.position.x + width);
@@ -778,15 +901,15 @@ export class DiagramComponent implements OnInit, OnDestroy, OnChanges {
    */
   exportToSVG(fileName: string = 'diagram.svg', download: boolean = true): string {
     const svgElement = this.svgRef.nativeElement;
-    
+
     // Clone the SVG to avoid modifying the live diagram
     const clone = svgElement.cloneNode(true) as SVGSVGElement;
-    
+
     // Get the bounding box of the content (nodes and edges)
     // We need to calculate this manually because getBBox() on the clone won't work if it's not in the DOM
     const nodes = this.nodes();
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-    
+
     if (nodes.length > 0) {
       nodes.forEach(node => {
         minX = Math.min(minX, node.position.x);
@@ -804,7 +927,7 @@ export class DiagramComponent implements OnInit, OnDestroy, OnChanges {
     minY -= padding;
     maxX += padding;
     maxY += padding;
-    
+
     const width = maxX - minX;
     const height = maxY - minY;
 
@@ -812,7 +935,7 @@ export class DiagramComponent implements OnInit, OnDestroy, OnChanges {
     clone.setAttribute('viewBox', `${minX} ${minY} ${width} ${height}`);
     clone.setAttribute('width', `${width}`);
     clone.setAttribute('height', `${height}`);
-    
+
     // Remove the transform from the viewport group in the clone to reset zoom/pan
     // The viewport group is the first child g element
     const viewportGroup = clone.querySelector('.ngx-flow__viewport');
@@ -823,7 +946,7 @@ export class DiagramComponent implements OnInit, OnDestroy, OnChanges {
     // Serialize the SVG
     const serializer = new XMLSerializer();
     let svgString = serializer.serializeToString(clone);
-    
+
     // Add XML declaration
     if (!svgString.match(/^<xml/)) {
       svgString = '<?xml version="1.0" encoding="utf-8"?>\n' + svgString;
@@ -847,44 +970,44 @@ export class DiagramComponent implements OnInit, OnDestroy, OnChanges {
    */
   async exportToPNG(fileName: string = 'diagram.png', download: boolean = true): Promise<string> {
     const svgString = this.exportToSVG(fileName, false);
-    
+
     return new Promise((resolve, reject) => {
       const img = new Image();
       const svgBlob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
       const url = URL.createObjectURL(svgBlob);
-      
+
       img.onload = () => {
         const canvas = document.createElement('canvas');
         canvas.width = img.width;
         canvas.height = img.height;
         const ctx = canvas.getContext('2d');
-        
+
         if (!ctx) {
           reject(new Error('Could not get canvas context'));
           return;
         }
-        
+
         // Draw white background
         ctx.fillStyle = '#ffffff';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
-        
+
         ctx.drawImage(img, 0, 0);
-        
+
         const pngUrl = canvas.toDataURL('image/png');
-        
+
         if (download) {
           this.downloadFile(pngUrl, fileName);
         }
-        
+
         URL.revokeObjectURL(url);
         resolve(pngUrl);
       };
-      
+
       img.onerror = (e) => {
         URL.revokeObjectURL(url);
         reject(e);
       };
-      
+
       img.src = url;
     });
   }

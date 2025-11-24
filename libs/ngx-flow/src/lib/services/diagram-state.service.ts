@@ -177,6 +177,24 @@ export class DiagramStateService {
     );
   }
 
+  resizeNode(id: string, width: number, height: number, position?: XYPosition): void {
+    // Only save state once when resize starts, not on every resize move
+    // This is handled by onResizeStart/End
+    this.nodes.update((currentNodes) =>
+      currentNodes.map((node) =>
+        node.id === id ? { ...node, width, height, ...(position ? { position } : {}) } : node
+      )
+    );
+  }
+
+  onResizeStart(node: Node): void {
+    this.undoRedoService.saveState(this.getCurrentState());
+  }
+
+  onResizeEnd(node: Node): void {
+    // Optional: emit resize end event if needed in the future
+  }
+
   // --- Edge Management ---
 
   addEdge(edge: Edge): void {
@@ -289,6 +307,8 @@ export class DiagramStateService {
   onEdgeClick(edge: Edge): void {
     this.edgeClick.emit(edge);
   }
+
+
 
   onDragStart(node: Node): void {
     this.undoRedoService.saveState(this.getCurrentState()); // Save state before drag starts
