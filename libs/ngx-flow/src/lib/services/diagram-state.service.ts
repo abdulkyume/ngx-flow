@@ -208,6 +208,23 @@ export class DiagramStateService {
     });
   }
 
+  updateEdge(id: string, newSource?: string, newSourceHandle?: string, newTarget?: string, newTargetHandle?: string): void {
+    this.undoRedoService.saveState(this.getCurrentState());
+    this.edges.update((currentEdges) =>
+      currentEdges.map((edge) => {
+        if (edge.id === id) {
+          const updatedEdge = { ...edge };
+          if (newSource) updatedEdge.source = newSource;
+          if (newSourceHandle !== undefined) updatedEdge.sourceHandle = newSourceHandle;
+          if (newTarget) updatedEdge.target = newTarget;
+          if (newTargetHandle !== undefined) updatedEdge.targetHandle = newTargetHandle;
+          return updatedEdge;
+        }
+        return edge;
+      })
+    );
+  }
+
   removeEdge(id: string): void {
     this.undoRedoService.saveState(this.getCurrentState());
     this.edges.update((currentEdges) => currentEdges.filter((edge) => edge.id !== id));

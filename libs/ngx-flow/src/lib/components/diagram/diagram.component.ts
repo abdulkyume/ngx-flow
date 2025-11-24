@@ -122,6 +122,11 @@ export class DiagramComponent implements OnInit, OnDestroy, OnChanges {
   private startResizePosition: XYPosition = { x: 0, y: 0 };
   private startNodeDimensions: { width: number; height: number; x: number; y: number } = { width: 0, height: 0, x: 0, y: 0 };
 
+  // Edge Updating
+  private isUpdatingEdge = false;
+  private updatingEdge: Edge | null = null;
+  private updatingEdgeHandle: 'source' | 'target' | null = null;
+
   // Default node dimensions
   defaultNodeWidth = 170;
   defaultNodeHeight = 60;
@@ -342,6 +347,8 @@ export class DiagramComponent implements OnInit, OnDestroy, OnChanges {
     // console.log('onPointerMove', { dragging: this.isDraggingNode, connecting: this.isConnecting, resizing: this.isResizing });
     if (this.isResizing) {
       this.resize(event);
+    } else if (this.isUpdatingEdge) {
+      this.updateEdge(event);
     } else if (this.isConnecting) {
       this.updateConnection(event);
     } else if (this.isDraggingNode) {
@@ -356,6 +363,8 @@ export class DiagramComponent implements OnInit, OnDestroy, OnChanges {
   onPointerUp(event: PointerEvent): void {
     if (this.isResizing) {
       this.stopResizing(event);
+    } else if (this.isUpdatingEdge) {
+      this.stopUpdatingEdge(event);
     } else if (this.isConnecting) {
       this.finishConnecting(event);
     } else if (this.isDraggingNode) {
@@ -368,7 +377,7 @@ export class DiagramComponent implements OnInit, OnDestroy, OnChanges {
   }
 
   onPointerLeave(event: PointerEvent): void {
-    if (this.isResizing || this.isPanning || this.isSelecting || this.isDraggingNode || this.isConnecting) {
+    if (this.isResizing || this.isUpdatingEdge || this.isPanning || this.isSelecting || this.isDraggingNode || this.isConnecting) {
       this.onPointerUp(event);
     }
   }
@@ -631,6 +640,118 @@ export class DiagramComponent implements OnInit, OnDestroy, OnChanges {
     this.diagramStateService.onResizeEnd(this.resizingNode);
     this.resizingNode = null;
     this.resizeHandle = null;
+  }
+
+  // --- Edge Updating Logic ---
+
+  startUpdatingEdge(event: PointerEvent, edge: Edge, handleType: 'source' | 'target'): void {
+    event.stopPropagation();
+    this.isUpdatingEdge = true;
+    this.updatingEdge = edge;
+    this.updatingEdgeHandle = handleType;
+    this.svgRef.nativeElement.setPointerCapture(event.pointerId);
+
+    const tempEdgeId = `temp-update-${edge.id}`;
+    this.currentPreviewEdgeId = tempEdgeId;
+
+    const sourceNode = this.nodes().find(n => n.id === edge.source);
+    const targetNode = this.nodes().find(n => n.id === edge.target);
+
+    if (!sourceNode || !targetNode) return;
+
+    const sourcePos = getHandleAbsolutePosition(sourceNode, edge.sourceHandle);
+    const targetPos = getHandleAbsolutePosition(targetNode, edge.targetHandle);
+
+    let startX, startY, endX, endY;
+
+    if (handleType === 'source') {
+      startX = targetPos.x;
+      startY = targetPos.y;
+      endX = sourcePos.x;
+      endY = sourcePos.y;
+    } else {
+      startX = sourcePos.x;
+      startY = sourcePos.y;
+      endX = targetPos.x;
+      endY = targetPos.y;
+    }
+
+    this.diagramStateService.addTempEdge({
+      id: tempEdgeId,
+      source: edge.source,
+      sourceHandle: edge.sourceHandle,
+      target: edge.target,
+      targetHandle: edge.targetHandle,
+      type: edge.type || 'bezier',
+      animated: edge.animated,
+      sourceX: startX,
+      sourceY: startY,
+      targetX: endX,
+      targetY: endY,
+      style: edge.style,
+      markerEnd: edge.markerEnd
+    });
+  }
+
+  private updateEdge(event: PointerEvent): void {
+    if (!this.updatingEdge || !this.currentPreviewEdgeId) return;
+    event.stopPropagation();
+
+    this.ngZone.runOutsideAngular(() => {
+      const diagramRect = this.svgRef.nativeElement.getBoundingClientRect();
+      const viewport = this.viewport();
+      const point = {
+        x: (event.clientX - diagramRect.left - viewport.x) / viewport.zoom,
+        y: (event.clientY - diagramRect.top - viewport.y) / viewport.zoom
+      };
+
+      this.diagramStateService.updateTempEdgeTarget(this.currentPreviewEdgeId!, point);
+
+      const element = document.elementFromPoint(event.clientX, event.clientY);
+      const handle = element?.closest('.ngx-flow__handle');
+
+      if (handle) {
+        const nodeId = handle.getAttribute('data-nodeid');
+        const handleId = handle.getAttribute('data-handleid');
+        const type = handle.getAttribute('data-type');
+
+        if (nodeId && type) {
+          this.currentTargetHandle = { nodeId, handleId: handleId || undefined, type: type as 'source' | 'target' };
+        }
+      } else {
+        this.currentTargetHandle = null;
+      }
+    });
+  }
+
+  private stopUpdatingEdge(event: PointerEvent): void {
+    if (!this.updatingEdge) return;
+    event.stopPropagation();
+    this.isUpdatingEdge = false;
+    this.svgRef.nativeElement.releasePointerCapture(event.pointerId);
+
+    if (this.currentPreviewEdgeId) {
+      this.diagramStateService.removeEdge(this.currentPreviewEdgeId);
+      this.currentPreviewEdgeId = null;
+    }
+
+    if (this.currentTargetHandle) {
+      const { nodeId, handleId, type } = this.currentTargetHandle;
+
+      if (this.updatingEdgeHandle === 'source') {
+        if (type === 'source' && this.isValidConnection(nodeId, this.updatingEdge.target)) {
+          this.diagramStateService.updateEdge(this.updatingEdge.id, nodeId, handleId);
+        }
+      } else {
+        if (this.isValidConnection(this.updatingEdge.source, nodeId)) {
+          this.diagramStateService.updateEdge(this.updatingEdge.id, undefined, undefined, nodeId, handleId);
+        }
+      }
+    }
+
+    this.updatingEdge = null;
+    this.updatingEdgeHandle = null;
+    this.currentTargetHandle = null;
   }
 
 
@@ -1019,5 +1140,21 @@ export class DiagramComponent implements OnInit, OnDestroy, OnChanges {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+  }
+
+  getEdgeHandlePosition(edge: Edge, type: 'source' | 'target'): XYPosition {
+    const nodes = this.nodes();
+    const nodeId = type === 'source' ? edge.source : edge.target;
+    const handleId = type === 'source' ? edge.sourceHandle : edge.targetHandle;
+    const node = nodes.find(n => n.id === nodeId);
+
+    if (!node) return { x: 0, y: 0 };
+
+    const pos = getHandleAbsolutePosition(node, handleId);
+
+    return {
+      x: isFinite(pos.x) ? pos.x : 0,
+      y: isFinite(pos.y) ? pos.y : 0
+    };
   }
 }
