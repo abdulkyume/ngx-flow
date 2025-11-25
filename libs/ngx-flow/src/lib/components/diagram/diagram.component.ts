@@ -105,7 +105,9 @@ export class DiagramComponent implements OnInit, OnDestroy, OnChanges {
   // Node Dragging
   private isDraggingNode = false;
   private draggingNode: Node | null = null;
+  private draggingNodes: Node[] = []; // All nodes being dragged (for multi-select)
   private startNodePosition: XYPosition = { x: 0, y: 0 };
+  private startNodePositions: Map<string, XYPosition> = new Map(); // Initial positions for multi-drag
   private startPointerPosition: XYPosition = { x: 0, y: 0 };
 
   // Connection (Handle)
@@ -520,6 +522,23 @@ export class DiagramComponent implements OnInit, OnDestroy, OnChanges {
     this.startNodePosition = { x: node.position.x, y: node.position.y };
     this.startPointerPosition = { x: event.clientX, y: event.clientY };
     this.svgRef.nativeElement.setPointerCapture(event.pointerId);
+
+    // Check if this node is part of a multi-selection
+    const selectedNodes = this.nodes().filter(n => n.selected);
+    if (selectedNodes.length > 1 && node.selected) {
+      // Multi-node drag: store all selected nodes and their positions
+      this.draggingNodes = selectedNodes;
+      this.startNodePositions.clear();
+      selectedNodes.forEach(n => {
+        this.startNodePositions.set(n.id, { x: n.position.x, y: n.position.y });
+      });
+    } else {
+      // Single node drag
+      this.draggingNodes = [node];
+      this.startNodePositions.clear();
+      this.startNodePositions.set(node.id, { x: node.position.x, y: node.position.y });
+    }
+
     this.diagramStateService.onDragStart(node);
   }
 
@@ -532,11 +551,27 @@ export class DiagramComponent implements OnInit, OnDestroy, OnChanges {
       const deltaX = (event.clientX - this.startPointerPosition.x) / zoom;
       const deltaY = (event.clientY - this.startPointerPosition.y) / zoom;
 
-      const newPosition = {
-        x: this.startNodePosition.x + deltaX,
-        y: this.startNodePosition.y + deltaY,
-      };
-      this.diagramStateService.moveNode(this.draggingNode!.id, newPosition);
+      if (this.draggingNodes.length > 1) {
+        // Multi-node drag: move all selected nodes by the same delta
+        const moves = this.draggingNodes.map(node => {
+          const startPos = this.startNodePositions.get(node.id)!;
+          return {
+            id: node.id,
+            position: {
+              x: startPos.x + deltaX,
+              y: startPos.y + deltaY
+            }
+          };
+        });
+        this.diagramStateService.moveNodes(moves);
+      } else {
+        // Single node drag
+        const newPosition = {
+          x: this.startNodePosition.x + deltaX,
+          y: this.startNodePosition.y + deltaY,
+        };
+        this.diagramStateService.moveNode(this.draggingNode!.id, newPosition);
+      }
     });
   }
 
@@ -545,8 +580,15 @@ export class DiagramComponent implements OnInit, OnDestroy, OnChanges {
     event.stopPropagation();
     this.isDraggingNode = false;
     this.svgRef.nativeElement.releasePointerCapture(event.pointerId);
-    this.diagramStateService.onDragEnd(this.draggingNode);
+
+    // Trigger onDragEnd for all dragged nodes
+    this.draggingNodes.forEach(node => {
+      this.diagramStateService.onDragEnd(node);
+    });
+
     this.draggingNode = null;
+    this.draggingNodes = [];
+    this.startNodePositions.clear();
   }
 
   // --- Resizing Logic ---
