@@ -469,4 +469,80 @@ export class DiagramStateService {
     // If multiple small state changes during drag need to be undone as one,
     // then the saveState logic here would be different (e.g., debounced save).
   }
+  // --- Clipboard Operations ---
+
+  private clipboard: { nodes: Node[]; edges: Edge[] } = { nodes: [], edges: [] };
+
+  copy(): void {
+    const selectedNodes = this.selectedNodes();
+    if (selectedNodes.length === 0) return;
+
+    const selectedNodeIds = new Set(selectedNodes.map((n) => n.id));
+
+    // Find edges that are connected ONLY to selected nodes
+    const internalEdges = this.edges().filter(
+      (edge) => selectedNodeIds.has(edge.source) && selectedNodeIds.has(edge.target)
+    );
+
+    // Deep copy to avoid reference issues
+    this.clipboard = {
+      nodes: JSON.parse(JSON.stringify(selectedNodes)),
+      edges: JSON.parse(JSON.stringify(internalEdges)),
+    };
+    console.log('Copied to clipboard:', this.clipboard);
+  }
+
+  paste(): void {
+    if (this.clipboard.nodes.length === 0) return;
+
+    this.undoRedoService.saveState(this.getCurrentState());
+
+    const idMap = new Map<string, string>();
+    const newNodes: Node[] = [];
+    const newEdges: Edge[] = [];
+
+    // Create new nodes with new IDs and offset position
+    this.clipboard.nodes.forEach((node) => {
+      const newId = uuidv4();
+      idMap.set(node.id, newId);
+      newNodes.push({
+        ...node,
+        id: newId,
+        position: { x: node.position.x + 20, y: node.position.y + 20 },
+        selected: true, // Select pasted nodes
+      });
+    });
+
+    // Create new edges with updated source/target IDs
+    this.clipboard.edges.forEach((edge) => {
+      const newSource = idMap.get(edge.source);
+      const newTarget = idMap.get(edge.target);
+      if (newSource && newTarget) {
+        newEdges.push({
+          ...edge,
+          id: uuidv4(),
+          source: newSource,
+          target: newTarget,
+          selected: true, // Select pasted edges
+        });
+      }
+    });
+
+    // Deselect existing elements
+    this.clearSelection();
+
+    // Add new elements
+    this.nodes.update((nodes) => [...nodes, ...newNodes]);
+    this.edges.update((edges) => [...edges, ...newEdges]);
+  }
+
+  cut(): void {
+    this.copy();
+    this.deleteSelectedElements();
+  }
+
+  duplicate(): void {
+    this.copy();
+    this.paste();
+  }
 }
