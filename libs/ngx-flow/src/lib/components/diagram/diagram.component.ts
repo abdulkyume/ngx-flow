@@ -5,7 +5,7 @@ import { Viewport, XYPosition, Node, Edge, TempEdge, DiagramState } from '../../
 import { Subscription } from 'rxjs';
 import { NGX_FLOW_NODE_TYPES } from '../../injection-tokens';
 import { NodeComponentType } from '../../types';
-import { getBezierPath, getStraightPath, getStepPath, getSelfLoopPath } from '../../utils';
+import { getBezierPath, getStraightPath, getStepPath, getSelfLoopPath, getSmartEdgePath, PathFinder, getPolylineMidpoint } from '../../utils';
 import { v4 as uuidv4 } from 'uuid';
 import { ZoomControlsComponent } from '../zoom-controls/zoom-controls.component';
 import { MinimapComponent } from '../minimap/minimap.component';
@@ -94,6 +94,24 @@ export class DiagramComponent implements OnInit, OnDestroy, OnChanges {
 
   // Expose Math to the template
   Math = Math;
+
+  private pathCache = new Map<string, string>();
+  private pathPointsCache = new Map<string, XYPosition[]>();
+
+  private pathFinder = computed(() => {
+    // Clear cache when nodes change (grid changes)
+    this.pathCache.clear();
+    this.pathPointsCache.clear();
+
+    const nodes = this.nodes();
+    return new PathFinder(nodes.map(n => ({
+      x: n.position.x,
+      y: n.position.y,
+      width: n.width || 170,
+      height: n.height || 60,
+      id: n.id
+    })));
+  });
 
   private isPanning = false;
   private lastPanPosition: XYPosition = { x: 0, y: 0 };
@@ -222,8 +240,15 @@ export class DiagramComponent implements OnInit, OnDestroy, OnChanges {
   ngOnChanges(changes: SimpleChanges): void {
     // Handle changes to input properties after initialization
     if (changes['initialNodes'] && !changes['initialNodes'].firstChange) {
-      // Sync nodes: add new ones, remove deleted ones, update existing ones
       const currentNodes = this.nodes();
+
+      // Optimization: If the array reference is the same, do nothing.
+      // This happens when the parent updates the input with the same array emitted by nodesChange.
+      if (this.initialNodes === currentNodes) {
+        return;
+      }
+
+      // Sync nodes: add new ones, remove deleted ones, update existing ones
       const currentNodeIds = new Set(currentNodes.map(n => n.id));
       const newNodeIds = new Set(this.initialNodes.map(n => n.id));
 
@@ -240,17 +265,29 @@ export class DiagramComponent implements OnInit, OnDestroy, OnChanges {
           // New node - add it
           this.diagramStateService.addNode(node);
         } else {
-          // Existing node - update it
-          this.diagramStateService.updateNode(node.id, node);
+          // Existing node - update it ONLY if it changed
+          const currentNode = currentNodes.find(n => n.id === node.id);
+          if (currentNode && JSON.stringify(currentNode) !== JSON.stringify(node)) {
+            this.diagramStateService.updateNode(node.id, node);
+          }
         }
       });
     }
     if (changes['initialEdges'] && !changes['initialEdges'].firstChange) {
-      // Set edges directly without triggering connect events
-      this.diagramStateService.edges.set([...this.initialEdges]);
+      const currentEdges = this.edges();
+      if (this.initialEdges === currentEdges) return;
+
+      // Check if edges actually changed content-wise
+      if (JSON.stringify(this.initialEdges) !== JSON.stringify(currentEdges)) {
+        // Set edges directly without triggering connect events
+        this.diagramStateService.edges.set([...this.initialEdges]);
+      }
     }
     if (changes['initialViewport'] && !changes['initialViewport'].firstChange && this.initialViewport) {
-      this.diagramStateService.setViewport(this.initialViewport);
+      const currentViewport = this.viewport();
+      if (JSON.stringify(this.initialViewport) !== JSON.stringify(currentViewport)) {
+        this.diagramStateService.setViewport(this.initialViewport);
+      }
     }
   }
 
@@ -528,7 +565,7 @@ export class DiagramComponent implements OnInit, OnDestroy, OnChanges {
           sourceHandle: this.connectingSourceHandleId,
           target: targetId,
           targetHandle: this.currentTargetHandle.handleId,
-          type: 'bezier',
+          // type: 'bezier', // Removed to use default smart routing
         };
         this.diagramStateService.addEdge(newEdge);
       } else {
@@ -933,10 +970,30 @@ export class DiagramComponent implements OnInit, OnDestroy, OnChanges {
       }
     }
 
+    // Use smart routing if type is 'smart' or not specified (default)
+    // But respect explicit 'straight' type if user wants simple straight line
+    if ((edge.type === 'smart' || !edge.type) && !isTemporary) {
+      const cacheKey = `${edge.id}-${sourcePos.x},${sourcePos.y}-${targetPos.x},${targetPos.y}`;
+
+      if (this.pathCache.has(cacheKey)) {
+        return this.pathCache.get(cacheKey)!;
+      }
+
+      try {
+        const path = this.pathFinder().findPath(sourcePos, targetPos);
+        const d = getSmartEdgePath(path);
+        this.pathCache.set(cacheKey, d);
+        return d;
+      } catch (e) {
+        console.warn('Pathfinding failed, falling back to straight path', e);
+        return getStraightPath(sourcePos, targetPos);
+      }
+    }
+
     switch (edge.type) {
       case 'bezier': return getBezierPath(sourcePos, targetPos);
       case 'step': return getStepPath(sourcePos, targetPos);
-      case 'straight':
+      case 'straight': return getStraightPath(sourcePos, targetPos);
       default: return getStraightPath(sourcePos, targetPos);
     }
   }
@@ -961,6 +1018,32 @@ export class DiagramComponent implements OnInit, OnDestroy, OnChanges {
 
     const sourcePos = getHandleAbsolutePosition(sourceNode, edge.sourceHandle);
     const targetPos = getHandleAbsolutePosition(targetNode, edge.targetHandle);
+
+    if (edge.type === 'smart' || !edge.type) {
+      try {
+        // For label position, we can re-use the cached path if available, 
+        // but we need the points, not the string. 
+        // For now, let's just re-calculate or maybe cache points too?
+        // Re-calculating for label might be okay if getEdgePath is cached, 
+        // but ideally we cache the points.
+        // Let's optimize this later if needed, or cache points instead of string.
+
+        // Optimization: Cache points instead of string
+        const cacheKey = `${edge.id}-${sourcePos.x},${sourcePos.y}-${targetPos.x},${targetPos.y}-points`;
+        let path: XYPosition[];
+
+        if (this.pathPointsCache.has(cacheKey)) {
+          path = this.pathPointsCache.get(cacheKey)!;
+        } else {
+          path = this.pathFinder().findPath(sourcePos, targetPos);
+          this.pathPointsCache.set(cacheKey, path);
+        }
+
+        return getPolylineMidpoint(path);
+      } catch (e) {
+        console.warn('Pathfinding failed for label position', e);
+      }
+    }
 
     // Return midpoint of the edge
     return {

@@ -25,7 +25,7 @@ export class App implements OnInit {
   edges: Edge[] = [];
   viewport: Viewport = { x: 0, y: 0, zoom: 1 };
 
-  constructor(private layoutService: LayoutService) {}
+  constructor(private layoutService: LayoutService) { }
 
   ngOnInit(): void {
     // Initial setup: Add some nodes and edges to demonstrate
@@ -37,44 +37,55 @@ export class App implements OnInit {
     ];
 
     this.edges = [
-      { 
-        id: 'e1-2', 
-        source: '1', 
-        sourceHandle: 'right', 
-        target: '2', 
-        targetHandle: 'left', 
-        type: 'bezier',
+      {
+        id: 'e1-2',
+        source: '1',
+        sourceHandle: 'right',
+        target: '2',
+        targetHandle: 'left',
+        // type: 'bezier', // Removed to test default smart routing
         label: 'processes',
         markerEnd: 'arrowclosed'
       },
-      { 
-        id: 'e1-3', 
-        source: '1', 
-        sourceHandle: 'bottom', 
-        target: '3', 
-        targetHandle: 'top', 
-        type: 'step',
+      {
+        id: 'e1-3',
+        source: '1',
+        sourceHandle: 'bottom',
+        target: '3',
+        targetHandle: 'top',
+        // type: 'step', // Removed to test default smart routing
         label: 'alternate path',
         markerEnd: 'arrow'
       },
-      { 
-        id: 'e2-4', 
-        source: '2', 
-        sourceHandle: 'right', 
-        target: '4', 
-        targetHandle: 'left', 
+      {
+        id: 'e2-4',
+        source: '2',
+        sourceHandle: 'right',
+        target: '4',
+        targetHandle: 'left',
         animated: true,
         label: 'completes',
         markerEnd: 'arrowclosed'
       },
-      { 
-        id: 'e3-4', 
-        source: '3', 
-        sourceHandle: 'right', 
-        target: '4', 
-        targetHandle: 'bottom', 
-        type: 'straight',
+      {
+        id: 'e3-4',
+        source: '3',
+        sourceHandle: 'right',
+        target: '4',
+        targetHandle: 'bottom',
+        // type: 'straight', // Removed to test default smart routing
         markerEnd: 'dot'
+      },
+      {
+        id: 'e1-4-smart',
+        source: '1',
+        sourceHandle: 'bottom',
+        target: '4',
+        targetHandle: 'top',
+        // type: 'smart', // Removed to test default smart routing
+        label: 'smart route',
+        markerEnd: 'arrow',
+        style: { stroke: 'blue', strokeWidth: 2 }
       }
     ];
   }
@@ -136,7 +147,7 @@ export class App implements OnInit {
     const json = JSON.stringify(state, null, 2);
     const blob = new Blob([json], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
-    
+
     const link = document.createElement('a');
     link.href = url;
     link.download = 'diagram.json';
@@ -152,7 +163,7 @@ export class App implements OnInit {
 
     const file = input.files[0];
     const reader = new FileReader();
-    
+
     reader.onload = (e) => {
       try {
         const json = e.target?.result as string;
@@ -163,7 +174,7 @@ export class App implements OnInit {
         alert('Invalid JSON file');
       }
     };
-    
+
     reader.readAsText(file);
     // Reset input so same file can be selected again
     input.value = '';

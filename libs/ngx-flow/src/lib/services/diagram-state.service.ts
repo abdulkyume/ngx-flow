@@ -5,6 +5,7 @@ import {
   computed,
   WritableSignal,
   ElementRef,
+  effect,
 } from '@angular/core';
 import { Node, Edge, Viewport, XYPosition, DiagramState } from '../models';
 import { Observable, Subject, animationFrameScheduler } from 'rxjs';
@@ -59,26 +60,37 @@ export class DiagramStateService {
   private viewportUpdates$ = new Subject<Viewport>();
 
   constructor(private undoRedoService: UndoRedoService) {
+    // Sync internal subjects to signals (for batched updates)
     this.nodeUpdates$
       .pipe(throttleTime(0, animationFrameScheduler, { leading: true, trailing: true }))
       .subscribe((nodes) => {
         this.nodes.set(nodes);
-        this.nodesChange.emit(nodes);
       });
 
     this.edgeUpdates$
       .pipe(throttleTime(0, animationFrameScheduler, { leading: true, trailing: true }))
       .subscribe((edges) => {
         this.edges.set(edges);
-        this.edgesChange.emit(edges);
       });
 
     this.viewportUpdates$
       .pipe(throttleTime(0, animationFrameScheduler, { leading: true, trailing: true }))
       .subscribe((viewport) => {
         this.viewport.set(viewport);
-        this.viewportChange.emit(viewport);
       });
+
+    // Emit changes whenever signals update
+    effect(() => {
+      this.nodesChange.emit(this.nodes());
+    });
+
+    effect(() => {
+      this.edgesChange.emit(this.edges());
+    });
+
+    effect(() => {
+      this.viewportChange.emit(this.viewport());
+    });
   }
 
   // Helper to get current state for undo/redo
