@@ -27,4 +27,7 @@ export interface Node<T = any> {
   maxHeight?: number;
   class?: string;
   style?: Record<string, string>;
+  parentId?: string;
+  expanded?: boolean;
+  extent?: 'parent';
 }

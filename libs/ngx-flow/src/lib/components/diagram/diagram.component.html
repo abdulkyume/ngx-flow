@@ -85,29 +85,13 @@
         <!-- Node outline and background (visual + dragging) -->
         <rect [attr.width]="node.width || defaultNodeWidth" [attr.height]="node.height || defaultNodeHeight" rx="3"
           ry="3" class="ngx-flow__node-rect"></rect>
+        <!-- Hit area -->
+        <circle [attr.cx]="(node.width || defaultNodeWidth) / 2" cy="-10" r="20" fill="transparent"
+          pointer-events="all"></circle>
+        <!-- Visual -->
+        <circle [attr.cx]="(node.width || defaultNodeWidth) / 2" [attr.cy]="0" r="6" class="ngx-flow__handle-circle">
+        </circle>
 
-        <!-- Dynamic content for custom nodes using ngComponentOutlet -->
-        <ng-container *ngIf="getCustomNodeComponent(node.type); else defaultNodeContent">
-          <ng-container *ngComponentOutlet="getCustomNodeComponent(node.type); inputs: { node: node }"></ng-container>
-        </ng-container>
-
-        <ng-template #defaultNodeContent>
-          <text x="85" y="30" text-anchor="middle" alignment-baseline="middle" class="ngx-flow__node-label">
-            {{ node.data?.label || node.id }}
-          </text>
-        </ng-template>
-
-        <!-- Node handles (Inlined) -->
-        <!-- Top Handle -->
-        <g class="ngx-flow__handle ngx-flow__handle--source ngx-flow__handle--target" [attr.data-nodeid]="node.id"
-          data-handleid="top" [attr.data-type]="'source'">
-          <!-- Hit area -->
-          <circle [attr.cx]="(node.width || defaultNodeWidth) / 2" cy="-10" r="20" fill="transparent"
-            pointer-events="all"></circle>
-          <!-- Visual -->
-          <circle [attr.cx]="(node.width || defaultNodeWidth) / 2" [attr.cy]="0" r="6" class="ngx-flow__handle-circle">
-          </circle>
-        </g>
         <!-- Right Handle -->
         <g class="ngx-flow__handle ngx-flow__handle--source ngx-flow__handle--target" [attr.data-nodeid]="node.id"
           data-handleid="right" [attr.data-type]="'source'">
@@ -136,7 +120,8 @@
             pointer-events="all"></circle>
           <!-- Visual -->
           <circle [attr.cx]="0" [attr.cy]="(node.height || defaultNodeHeight) / 2" r="6"
-            class="ngx-flow__handle-circle"></circle>
+            class="ngx-flow__handle-circle">
+          </circle>
         </g>
 
         <!-- Resize Handles -->
@@ -156,6 +141,7 @@
         </g>
 
       </g>
+
     </g>
   </svg>
 

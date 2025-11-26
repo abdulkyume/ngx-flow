@@ -357,6 +357,33 @@ export class DiagramComponent implements OnInit, OnDestroy, OnChanges {
     this.diagramStateService.duplicate();
   }
 
+  @HostListener('window:keydown.control.g', ['$event'])
+  @HostListener('window:keydown.meta.g', ['$event'])
+  onGroupKeyPress(event: any): void {
+    if (this.isInputActive(event)) return;
+    event.preventDefault(); // Prevent browser find
+    const selectedNodes = this.diagramStateService.selectedNodes();
+    if (selectedNodes.length > 1) {
+      this.diagramStateService.groupNodes(selectedNodes.map(n => n.id));
+    }
+  }
+
+  @HostListener('window:keydown.control.shift.g', ['$event'])
+  @HostListener('window:keydown.meta.shift.g', ['$event'])
+  onUngroupKeyPress(event: any): void {
+    if (this.isInputActive(event)) return;
+    event.preventDefault();
+    const selectedNodes = this.diagramStateService.selectedNodes();
+    if (selectedNodes.length === 1 && selectedNodes[0].type === 'group') {
+      this.diagramStateService.ungroupNodes(selectedNodes[0].id);
+    }
+  }
+
+  toggleGroup(event: Event, node: Node): void {
+    event.stopPropagation();
+    this.diagramStateService.toggleGroup(node.id);
+  }
+
   private isInputActive(event: any): boolean {
     const target = event.target as HTMLElement;
     return target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable;

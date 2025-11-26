@@ -145,60 +145,6 @@ export class DiagramStateService {
     }
   }
 
-  // --- Node Management ---
-
-  addNode(node: Node): void {
-    this.undoRedoService.saveState(this.getCurrentState());
-    this.nodes.update((currentNodes) => [
-      ...currentNodes,
-      { ...node, selected: false, dragging: false, draggable: true },
-    ]);
-  }
-
-  updateNode(id: string, changes: Partial<Node>): void {
-    this.nodes.update((currentNodes) =>
-      currentNodes.map((node) => (node.id === id ? { ...node, ...changes } : node))
-    );
-  }
-
-  removeNode(id: string): void {
-    this.undoRedoService.saveState(this.getCurrentState());
-    this.nodes.update((currentNodes) => currentNodes.filter((node) => node.id !== id));
-    this.edges.update((currentEdges) =>
-      currentEdges.filter((edge) => edge.source !== id && edge.target !== id)
-    );
-    this.tempEdges.update((currentTempEdges) =>
-      currentTempEdges.filter((edge) => edge.source !== id && edge.target !== id)
-    );
-  }
-
-  moveNode(id: string, newPosition: XYPosition): void {
-    // Only save state once when drag starts, not on every move
-    // This is handled by onDragStart/End
-    this.nodes.update((currentNodes) =>
-      currentNodes.map((node) => (node.id === id ? { ...node, position: newPosition } : node))
-    );
-  }
-
-  moveNodes(moves: { id: string; position: XYPosition }[]): void {
-    this.nodes.update((currentNodes) =>
-      currentNodes.map((node) => {
-        const move = moves.find((m) => m.id === node.id);
-        return move ? { ...node, position: move.position } : node;
-      })
-    );
-  }
-
-  resizeNode(id: string, width: number, height: number, position?: XYPosition): void {
-    // Only save state once when resize starts, not on every resize move
-    // This is handled by onResizeStart/End
-    this.nodes.update((currentNodes) =>
-      currentNodes.map((node) =>
-        node.id === id ? { ...node, width, height, ...(position ? { position } : {}) } : node
-      )
-    );
-  }
-
   onResizeStart(node: Node): void {
     this.undoRedoService.saveState(this.getCurrentState());
   }
@@ -544,5 +490,175 @@ export class DiagramStateService {
   duplicate(): void {
     this.copy();
     this.paste();
+  }
+  // --- Grouping Operations ---
+
+  groupNodes(nodeIds: string[]): void {
+    if (nodeIds.length < 2) return;
+    this.undoRedoService.saveState(this.getCurrentState());
+
+    const nodesToGroup = this.nodes().filter((n) => nodeIds.includes(n.id));
+    if (nodesToGroup.length === 0) return;
+
+    // Calculate bounding box
+    const minX = Math.min(...nodesToGroup.map((n) => n.position.x));
+    const minY = Math.min(...nodesToGroup.map((n) => n.position.y));
+    const maxX = Math.max(...nodesToGroup.map((n) => n.position.x + (n.width || 150)));
+    const maxY = Math.max(...nodesToGroup.map((n) => n.position.y + (n.height || 60)));
+
+    const padding = 20;
+    const groupNode: Node = {
+      id: uuidv4(),
+      type: 'group',
+      position: { x: minX - padding, y: minY - padding },
+      width: maxX - minX + padding * 2,
+      height: maxY - minY + padding * 2,
+      data: { label: 'Group' },
+      expanded: true,
+      selected: true,
+    };
+
+    // Update children to point to parent
+    // Note: We are keeping absolute coordinates for now, so no position update needed for children
+    const updatedChildren = nodesToGroup.map((n) => ({ ...n, parentId: groupNode.id, selected: false }));
+    const otherNodes = this.nodes().filter((n) => !nodeIds.includes(n.id));
+
+    this.nodes.set([...otherNodes, groupNode, ...updatedChildren]);
+    this.clearSelection();
+    this.selectNodes([groupNode.id]);
+  }
+
+  ungroupNodes(groupId: string): void {
+    const groupNode = this.nodes().find((n) => n.id === groupId);
+    if (!groupNode || groupNode.type !== 'group') return;
+
+    this.undoRedoService.saveState(this.getCurrentState());
+
+    // Remove parentId from children
+    const updatedNodes = this.nodes().map((n) => {
+      if (n.parentId === groupId) {
+        const { parentId, ...rest } = n;
+        return { ...rest, selected: true };
+      }
+      return n;
+    });
+
+    // Remove group node
+    this.nodes.set(updatedNodes.filter((n) => n.id !== groupId));
+  }
+
+  addNode(node: Node): void {
+    this.undoRedoService.saveState(this.getCurrentState());
+    this.nodes.update((nodes) => [...nodes, { ...node, selected: false }]);
+  }
+
+  removeNode(id: string): void {
+    this.undoRedoService.saveState(this.getCurrentState());
+    this.nodes.update((nodes) => nodes.filter((n) => n.id !== id));
+    this.edges.update((edges) => edges.filter((e) => e.source !== id && e.target !== id));
+  }
+
+  updateNode(id: string, changes: Partial<Node>): void {
+    if (!changes.dragging && !changes.position) {
+      this.undoRedoService.saveState(this.getCurrentState());
+    }
+    this.nodes.update((nodes) =>
+      nodes.map((n) => {
+        if (n.id === id) {
+          return { ...n, ...changes };
+        }
+        return n;
+      })
+    );
+  }
+
+  resizeNode(id: string, width: number, height: number, position?: XYPosition): void {
+    this.undoRedoService.saveState(this.getCurrentState());
+    this.nodes.update((nodes) =>
+      nodes.map((n) => {
+        if (n.id === id) {
+          return { ...n, width, height, ...(position ? { position } : {}) };
+        }
+        return n;
+      })
+    );
+  }
+
+  toggleGroup(groupId: string): void {
+    this.nodes.update((nodes) =>
+      nodes.map((n) => {
+        if (n.id === groupId) {
+          return { ...n, expanded: !n.expanded };
+        }
+        return n;
+      })
+    );
+  }
+
+  // Override moveNode to handle group children
+  // Move node and handle group children
+  moveNode(id: string, newPosition: XYPosition): void {
+    const node = this.nodes().find((n) => n.id === id);
+    if (!node) return;
+
+    const dx = newPosition.x - node.position.x;
+    const dy = newPosition.y - node.position.y;
+
+    // Update the moved node
+    const updatedNodes = this.nodes().map((n) => {
+      if (n.id === id) {
+        return { ...n, position: newPosition };
+      }
+      return n;
+    });
+
+    // If it's a group, move all children recursively
+    if (node.type === 'group') {
+      this.moveChildren(id, dx, dy, updatedNodes);
+    }
+
+    this.nodes.set(updatedNodes);
+  }
+
+  private moveChildren(parentId: string, dx: number, dy: number, nodes: Node[]): void {
+    for (let i = 0; i < nodes.length; i++) {
+      if (nodes[i].parentId === parentId) {
+        nodes[i] = {
+          ...nodes[i],
+          position: {
+            x: nodes[i].position.x + dx,
+            y: nodes[i].position.y + dy,
+          },
+        };
+        // Recursively move children of children (nested groups)
+        if (nodes[i].type === 'group') {
+          this.moveChildren(nodes[i].id, dx, dy, nodes);
+        }
+      }
+    }
+  }
+
+  // Override moveNodes for batch movement
+  // Move multiple nodes (batch movement)
+  moveNodes(moves: { id: string; position: XYPosition }[]): void {
+    let currentNodes = [...this.nodes()];
+
+    moves.forEach(move => {
+      const node = currentNodes.find(n => n.id === move.id);
+      if (!node) return;
+
+      const dx = move.position.x - node.position.x;
+      const dy = move.position.y - node.position.y;
+
+      // Update parent node
+      currentNodes = currentNodes.map(n => n.id === move.id ? { ...n, position: move.position } : n);
+
+      // If group, move children
+      if (node.type === 'group') {
+        this.moveChildren(node.id, dx, dy, currentNodes);
+      }
+    });
+
+    this.nodes.set(currentNodes);
   }
 }

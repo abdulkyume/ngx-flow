@@ -1,3 +1,4 @@
+
 :host {
   display: block;
   width: 100%;
@@ -189,5 +190,238 @@
 
   &[data-handle='se'] {
     cursor: se-resize;
+  }
+}
+
+/* Group Node Styles */
+.ngx-flow__group-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 5px;
+  background-color: rgba(0, 0, 0, 0.05);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+  box-sizing: border-box;
+}
+
+.ngx-flow__group-label {
+  font-family: sans-serif;
+  font-size: 12px;
+  font-weight: bold;
+  color: #555;
+  pointer-events: none;
+}
+
+.ngx-flow__group-toggle {
+  background: none;
+  border: 1px solid #ccc;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 10px;
+  width: 16px;
+  height: 16px;
+  display: flex;
+}
+
+.ngx-flow__selection-box {
+  fill: rgba(0, 0, 255, 0.1);
+  stroke: rgb(0, 0, 255);
+  stroke-width: 1px;
+  stroke-dasharray: 5 5;
+  pointer-events: none; /* Make selection box non-interactive */
+}
+
+/* Node Styles */
+.ngx-flow__node {
+  cursor: grab;
+
+  &.selected .ngx-flow__node-rect {
+    stroke: var(--ngx-flow-selection-color, #1a192b);
+    stroke-width: 2px;
+  }
+
+  &.dragging {
+    cursor: grabbing;
+    opacity: 0.8;
+  }
+
+  &.invalid-connection .ngx-flow__node-rect {
+    stroke: #ff0000;
+    stroke-width: 2px;
+    animation: flash 0.2s ease-in-out 3;
+  }
+}
+
+@keyframes flash {
+  0%, 100% { stroke: #ff0000; }
+  50% { stroke: var(--ngx-flow-node-border, #1a192b); }
+}
+
+.ngx-flow__node-rect {
+  fill: var(--ngx-flow-node-bg, #fff);
+  stroke: var(--ngx-flow-node-border, #1a192b);
+  stroke-width: 1.5px;
+  pointer-events: all; /* Allow dragging via node body */
+  cursor: grab;
+}
+
+.ngx-flow__hitbox {
+  fill: transparent;
+  cursor: grab;
+  pointer-events: none; /* Not used anymore */
+}
+
+.ngx-flow__node-label {
+  font-family: sans-serif;
+  font-size: 14px;
+  fill: var(--ngx-flow-node-text-color, #333);
+  pointer-events: none; /* Let events pass through to node-rect */
+}
+
+/* Edge Styles */
+.ngx-flow__edge {
+  pointer-events: none;
+
+  &-path {
+    fill: none;
+    stroke: var(--ngx-flow-edge-stroke, #b1b1b7);
+    stroke-width: 1.5;
+    pointer-events: none;
+  }
+
+  &-hitbox {
+    fill: none;
+    stroke: transparent;
+    stroke-width: 20;
+    pointer-events: all;
+    cursor: pointer;
+  }
+
+  &.selected .ngx-flow__edge-path {
+    stroke: var(--ngx-flow-edge-stroke-selected, #555);
+    stroke-width: 2.5;
+  }
+
+  &:hover .ngx-flow__edge-path {
+    stroke: var(--ngx-flow-edge-stroke-hover, #777);
+  }
+
+  &.animated .ngx-flow__edge-path {
+    stroke-dasharray: 5;
+    animation: dashdraw 0.5s linear infinite;
+  }
+}
+
+/* Edge Labels */
+.ngx-flow__edge-label {
+  pointer-events: none;
+  user-select: none;
+
+  &-text {
+    font-family: sans-serif;
+  }
+
+  &-input {
+    width: 100%;
+    height: 100%;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    padding: 4px;
+    font-size: 12px;
+    pointer-events: all; /* Enable interaction */
+    box-sizing: border-box;
+  }
+}
+
+@keyframes dash {
+  to {
+    stroke-dashoffset: -100;
+  }
+}
+
+/* Handle Styles */
+.ngx-flow__handle {
+  transform: translate(0, 0); /* Will be positioned dynamically by parent node */
+  pointer-events: all; /* Ensure handle group captures events */
+
+  &--source .ngx-flow__handle-circle {
+    fill: var(--ngx-flow-source-handle-color, #1a192b);
+    stroke: var(--ngx-flow-source-handle-border, #fff);
+    stroke-width: 1.5;
+    pointer-events: all; /* Ensure handle captures events */
+  }
+
+  &--target .ngx-flow__handle-circle {
+    fill: var(--ngx-flow-target-handle-color, #1a192b);
+    stroke: var(--ngx-flow-target-handle-border, #fff);
+    stroke-width: 1.5;
+    pointer-events: all; /* Ensure handle captures events */
+  }
+
+  &--valid-target .ngx-flow__handle-circle {
+    fill: var(--ngx-flow-handle-valid-target-color, #00ff00);
+    stroke: var(--ngx-flow-handle-valid-target-border, #007f00);
+  }
+}
+
+/* Resize Handle Styles */
+.ngx-flow__resize-handle {
+  fill: var(--ngx-flow-resize-handle-bg, #fff);
+  stroke: var(--ngx-flow-resize-handle-border, #1a192b);
+  stroke-width: 1;
+  pointer-events: all;
+
+  &[data-handle='nw'] {
+    cursor: nw-resize;
+  }
+
+  &[data-handle='ne'] {
+    cursor: ne-resize;
+  }
+
+  &[data-handle='sw'] {
+    cursor: sw-resize;
+  }
+
+  &[data-handle='se'] {
+    cursor: se-resize;
+  }
+}
+
+/* Group Node Styles */
+.ngx-flow__group-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 5px;
+  background-color: rgba(0, 0, 0, 0.05);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+  box-sizing: border-box;
+}
+
+.ngx-flow__group-label {
+  font-family: sans-serif;
+  font-size: 12px;
+  font-weight: bold;
+  color: #555;
+  pointer-events: none;
+}
+
+.ngx-flow__group-toggle {
+  background: none;
+  border: 1px solid #ccc;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 10px;
+  width: 16px;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  pointer-events: all;
+
+  &:hover {
+    background-color: #eee;
   }
 }
