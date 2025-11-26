@@ -5,7 +5,7 @@ import { Viewport, XYPosition, Node, Edge, TempEdge, DiagramState } from '../../
 import { Subscription } from 'rxjs';
 import { NGX_FLOW_NODE_TYPES } from '../../injection-tokens';
 import { NodeComponentType } from '../../types';
-import { getBezierPath, getStraightPath, getStepPath } from '../../utils';
+import { getBezierPath, getStraightPath, getStepPath, getSelfLoopPath } from '../../utils';
 import { v4 as uuidv4 } from 'uuid';
 import { ZoomControlsComponent } from '../zoom-controls/zoom-controls.component';
 import { MinimapComponent } from '../minimap/minimap.component';
@@ -139,15 +139,15 @@ export class DiagramComponent implements OnInit, OnDestroy, OnChanges {
   @Input() connectionValidator?: (sourceNodeId: string, targetNodeId: string) => boolean;
   // Input for node resizing (global toggle)
   @Input() nodesResizable: boolean = true;
-
-
   // Helper to check if a connection is allowed
   private isValidConnection(sourceId: string, targetId: string): boolean {
-    // Prevent self-connections
-    if (sourceId === targetId) return false;
+    // console.log('isValidConnection checking:', sourceId, targetId);
     // Prevent duplicate edges between same source and target
     const existing = this.edges().some(e => e.source === sourceId && e.target === targetId);
-    if (existing) return false;
+    if (existing) {
+      // console.log('isValidConnection: existing edge found');
+      return false;
+    }
     // Use custom validator if provided
     if (this.connectionValidator) {
       return this.connectionValidator(sourceId, targetId);
@@ -444,21 +444,40 @@ export class DiagramComponent implements OnInit, OnDestroy, OnChanges {
 
       this.diagramStateService.updateTempEdgeTarget(this.currentPreviewEdgeId!, { x: currentPointerX, y: currentPointerY });
 
-      // Use elementFromPoint to find what's actually under the mouse
-      // because setPointerCapture causes event.target to always be the captured element
-      const elementUnderMouse = document.elementFromPoint(event.clientX, event.clientY);
-      const closestHandle = elementUnderMouse?.closest('.ngx-flow__handle') as HTMLElement;
+      // Use geometric distance check instead of elementFromPoint to avoid pointer capture issues
+      let closestHandle: { nodeId: string, handleId: string } | null = null;
+      let minDistance = 20; // Detection radius
+
+      const nodes = this.nodes();
+      for (const node of nodes) {
+        const handles = ['top', 'right', 'bottom', 'left'];
+        for (const handleId of handles) {
+          const handlePos = getHandleAbsolutePosition(node, handleId);
+          const dist = Math.hypot(handlePos.x - currentPointerX, handlePos.y - currentPointerY);
+          if (dist < minDistance) {
+            minDistance = dist;
+            closestHandle = { nodeId: node.id, handleId: handleId };
+          }
+        }
+      }
 
       this.clearTargetHandleHighlight();
 
       if (closestHandle) {
-        const targetNodeId = closestHandle.dataset['nodeid'];
-        const targetHandleId = closestHandle.dataset['handleid'];
+        const targetNodeId = closestHandle.nodeId;
+        const targetHandleId = closestHandle.handleId;
 
-        // Allow connecting to any handle on a different node
+        // Allow connecting to any handle on a different node OR same node (self-loop)
+        // console.log('updateConnection: handle found', targetNodeId, this.connectingSourceNodeId);
         if (targetNodeId && this.isValidConnection(this.connectingSourceNodeId!, targetNodeId)) {
           this.currentTargetHandle = { nodeId: targetNodeId, handleId: targetHandleId, type: 'target' };
-          this.renderer.addClass(closestHandle, 'ngx-flow__handle--valid-target');
+
+          // We need to find the handle element to highlight it
+          // This is a bit expensive but necessary for visual feedback
+          const handleEl = this.el.nativeElement.querySelector(`.ngx-flow__handle[data-nodeid="${targetNodeId}"][data-handleid="${targetHandleId}"]`);
+          if (handleEl) {
+            this.renderer.addClass(handleEl, 'ngx-flow__handle--valid-target');
+          }
         } else {
           this.currentTargetHandle = null;
         }
@@ -908,6 +927,10 @@ export class DiagramComponent implements OnInit, OnDestroy, OnChanges {
 
       sourcePos = getHandleAbsolutePosition(sourceNode, edge.sourceHandle);
       targetPos = getHandleAbsolutePosition(targetNode, edge.targetHandle);
+
+      if (sourceNode.id === targetNode.id) {
+        return getSelfLoopPath(sourcePos, edge.sourceHandle);
+      }
     }
 
     switch (edge.type) {
