@@ -716,7 +716,7 @@ export class DiagramStateService {
       if (snappedXNode) break;
     }
 
-    // this.alignmentGuides.set(guides);
+    this.alignmentGuides.set(guides);
 
     const finalPosition = { x: snappedX, y: snappedY };
     const dx = finalPosition.x - node.position.x;
