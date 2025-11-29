@@ -90,6 +90,8 @@ export class DiagramComponent implements OnInit, OnDestroy, OnChanges {
 
   viewport!: WritableSignal<Viewport>;
   nodes!: WritableSignal<Node[]>;
+  viewNodes!: Signal<Node[]>;
+  filteredNodes!: Signal<Node[]>;
   edges!: WritableSignal<Edge[]>;
   tempEdges!: WritableSignal<TempEdge[]>;
   alignmentGuides!: Signal<AlignmentGuide[]>;
@@ -195,14 +197,18 @@ export class DiagramComponent implements OnInit, OnDestroy, OnChanges {
   }
 
   constructor(
-    private el: ElementRef<HTMLElement>, // Host element
+    public el: ElementRef<HTMLElement>, // Host element
     private renderer: Renderer2,
     private ngZone: NgZone,
     private cdRef: ChangeDetectorRef,
-    private diagramStateService: DiagramStateService,
-    @Optional() @Inject(NGX_FLOW_NODE_TYPES) private nodeTypes: Record<string, NodeComponentType> | null
+    public diagramStateService: DiagramStateService,
+    @Optional() @Inject(NGX_FLOW_NODE_TYPES) public nodeTypes: Record<string, NodeComponentType> | null
   ) {
     this.nodes$ = toObservable(this.diagramStateService.nodes);
+  }
+
+  get nodeTypeKeys(): string[] {
+    return this.nodeTypes ? Object.keys(this.nodeTypes) : [];
   }
 
   private nodes$: Observable<Node[]>;
@@ -210,6 +216,7 @@ export class DiagramComponent implements OnInit, OnDestroy, OnChanges {
     this.diagramStateService.el = this.svgRef;
     this.viewport = this.diagramStateService.viewport;
     this.nodes = this.diagramStateService.nodes;
+    this.filteredNodes = this.diagramStateService.viewNodes;
     this.edges = this.diagramStateService.edges;
     this.tempEdges = this.diagramStateService.tempEdges;
     this.alignmentGuides = this.diagramStateService.alignmentGuides;
@@ -1455,6 +1462,25 @@ export class DiagramComponent implements OnInit, OnDestroy, OnChanges {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+    document.body.removeChild(link);
+  }
+
+  onSearch(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    this.diagramStateService.setSearchQuery(input.value);
+  }
+
+  onFilterType(event: Event): void {
+    const select = event.target as HTMLSelectElement;
+    this.diagramStateService.setFilterType(select.value || null);
+  }
+
+  onZoomChange(zoom: number): void {
+    this.diagramStateService.setZoom(zoom);
+  }
+
+  onMinimapViewportChange(viewport: Viewport): void {
+    this.diagramStateService.setViewport(viewport);
   }
 
   getEdgeHandlePosition(edge: Edge, type: 'source' | 'target'): XYPosition {

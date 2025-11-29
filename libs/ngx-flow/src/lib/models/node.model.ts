@@ -31,4 +31,6 @@ export interface Node<T = any> {
   expanded?: boolean;
   extent?: 'parent';
   label?: string;
+  highlighted?: boolean;
+  dimmed?: boolean;
 }

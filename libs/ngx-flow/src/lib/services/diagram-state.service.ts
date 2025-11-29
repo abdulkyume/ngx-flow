@@ -37,6 +37,8 @@ export class DiagramStateService {
   readonly tempEdges: WritableSignal<TempEdge[]> = signal<TempEdge[]>([]);
   readonly viewport: WritableSignal<Viewport> = signal<Viewport>({ x: 0, y: 0, zoom: 1 });
   readonly alignmentGuides = signal<AlignmentGuide[]>([]);
+  readonly searchQuery = signal<string>('');
+  readonly filterType = signal<string | null>(null);
 
   // Reference to the main SVG element, set by DiagramComponent
   el!: ElementRef<SVGSVGElement>;
@@ -44,6 +46,33 @@ export class DiagramStateService {
   // Computed signals for derived state
   readonly selectedNodes = computed(() => this.nodes().filter((node) => node.selected));
   readonly selectedEdges = computed(() => this.edges().filter((edge) => edge.selected));
+
+  // Computed signal for view nodes (applying search/filter state)
+  readonly viewNodes = computed(() => {
+    const nodes = this.nodes();
+    const query = this.searchQuery().toLowerCase();
+    const type = this.filterType();
+
+    if (!query && !type) {
+      return nodes.map(n => ({ ...n, highlighted: false, dimmed: false }));
+    }
+
+    return nodes.map(node => {
+      const matchesQuery = !query ||
+        (node.label?.toLowerCase().includes(query)) ||
+        (JSON.stringify(node.data).toLowerCase().includes(query));
+
+      const matchesType = !type || node.type === type;
+
+      const isMatch = matchesQuery && matchesType;
+
+      return {
+        ...node,
+        highlighted: isMatch,
+        dimmed: !isMatch
+      };
+    });
+  });
 
   // Event Emitters
   readonly nodeClick = new EventEmitter<Node>();
@@ -794,5 +823,17 @@ export class DiagramStateService {
     });
 
     this.nodes.set(currentNodes);
+  }
+
+  setSearchQuery(query: string): void {
+    this.searchQuery.set(query);
+  }
+
+  setFilterType(type: string | null): void {
+    this.filterType.set(type);
+  }
+
+  setZoom(zoom: number): void {
+    this.viewport.update(v => ({ ...v, zoom }));
   }
 }

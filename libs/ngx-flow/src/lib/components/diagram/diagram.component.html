@@ -77,7 +77,7 @@
       </g>
 
       <!-- Nodes -->
-      <g *ngFor="let node of nodes(); trackBy: trackByNodeId" class="ngx-flow__node" [attr.data-id]="node.id"
+      <g *ngFor="let node of filteredNodes(); trackBy: trackByNodeId" class="ngx-flow__node" [attr.data-id]="node.id"
         [class.selected]="node.selected" [class.dragging]="node.dragging"
         [attr.transform]="'translate(' + node.position.x + ',' + node.position.y + ')'">
 
@@ -168,19 +168,25 @@
 
   </svg>
 
-  <ngx-zoom-controls *ngIf="showZoomControls" [zoom]="viewport().zoom" [minZoom]="0.1" [maxZoom]="4" (zoomIn)="zoomIn()"
-    (zoomOut)="zoomOut()" (fitView)="fitView()" (resetZoom)="resetZoom()">
-  </ngx-zoom-controls>
-
-  <ngx-alignment-controls></ngx-alignment-controls>
-
-  <div class="ngx-flow__io-controls"
-    style="position: absolute; top: 10px; right: 10px; display: flex; gap: 5px; z-index: 10;">
+  <!-- IO Controls -->
+  <div class="ngx-flow__io-controls">
+    <input type="text" placeholder="Search..." (input)="onSearch($event)">
+    <select (change)="onFilterType($event)">
+      <option value="">All Types</option>
+      <option *ngFor="let type of nodeTypeKeys" [value]="type">{{ type }}</option>
+    </select>
+    <div class="ngx-flow__separator"></div>
     <button (click)="exportToJSON()">Export JSON</button>
     <button (click)="triggerImport()">Import JSON</button>
     <button (click)="exportToPNG()">Export PNG</button>
     <button (click)="exportToSVG()">Export SVG</button>
   </div>
+
+  <ngx-zoom-controls *ngIf="showZoomControls" [zoom]="viewport().zoom" [minZoom]="0.1" [maxZoom]="4"
+    (zoomIn)="onZoomChange(viewport().zoom + 0.1)" (zoomOut)="onZoomChange(viewport().zoom - 0.1)"
+    (fitView)="onZoomChange(1)" (resetZoom)="onZoomChange(1)"></ngx-zoom-controls>
+
+  <ngx-alignment-controls></ngx-alignment-controls>
 
   <ngx-minimap *ngIf="showMinimap"></ngx-minimap>
 </div>

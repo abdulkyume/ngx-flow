@@ -55,6 +55,17 @@
     stroke-width: 2px;
     animation: flash 0.2s ease-in-out 3;
   }
+
+  &.highlighted .ngx-flow__node-rect {
+    stroke: #007bff; // Blue highlight
+    stroke-width: 3px;
+    filter: drop-shadow(0 0 5px rgba(0, 123, 255, 0.5));
+  }
+
+  &.dimmed {
+    opacity: 0.3;
+    // pointer-events: none; // Keep interaction enabled for now
+  }
 }
 
 @keyframes flash {
@@ -434,5 +445,54 @@
     stroke: #ff0000;
     stroke-width: 1;
     stroke-dasharray: 4 2;
+  }
+}
+
+/* IO Controls */
+.ngx-flow__io-controls {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  z-index: 10;
+  display: flex;
+  gap: 8px;
+  background: white;
+  padding: 8px;
+  border-radius: 4px;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+  align-items: center;
+
+  input[type="text"] {
+    padding: 4px 8px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-size: 14px;
+  }
+
+  select {
+    padding: 4px 8px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-size: 14px;
+  }
+
+  .ngx-flow__separator {
+    width: 1px;
+    height: 20px;
+    background: #ccc;
+    margin: 0 4px;
+  }
+
+  button {
+    padding: 4px 12px;
+    background: #f0f0f0;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+
+    &:hover {
+      background: #e0e0e0;
+    }
   }
 }
