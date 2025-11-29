@@ -1,14 +1,12 @@
 <div class="ngx-flow__container">
   <ngx-background *ngIf="showBackground" [variant]="backgroundVariant" [gap]="backgroundGap" [size]="backgroundSize"
     [color]="backgroundColor" [backgroundColor]="backgroundBgColor"></ngx-background>
-  <svg #svg class="ngx-flow__diagram" (wheel)="onWheel($event)" (pointerdown)="onPointerDown($event)"
-    (pointermove)="onPointerMove($event)" (pointerup)="onPointerUp($event)" (pointerleave)="onPointerLeave($event)">
+  <svg #svg class="ngx-flow__diagram" (wheel)="onWheel($event)" (pointerdown)="onPointerDown($event)">
     <defs>
       <pattern id="ngx-flow__grid-pattern" x="0" y="0" width="20" height="20" patternUnits="userSpaceOnUse">
         <circle cx="0.5" cy="0.5" r="0.5" fill="#ccc" />
       </pattern>
 
-      <!-- Edge Markers -->
       <!-- Arrow marker -->
       <marker id="ngx-flow__arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6"
         orient="auto-start-reverse">
@@ -140,12 +138,33 @@
             [attr.y]="(node.height || defaultNodeHeight) - 5" width="10" height="10"></rect>
         </g>
 
+        <!-- Group Node Template -->
+        <g *ngIf="node.type === 'group'" class="ngx-flow__group-node">
+          <!-- Header -->
+          <rect [attr.width]="node.width" height="30" class="ngx-flow__group-header"></rect>
+          <text [attr.x]="10" [attr.y]="20" class="ngx-flow__group-label">{{ node.label }}</text>
+
+          <!-- Expand/Collapse Toggle -->
+          <g class="ngx-flow__group-toggle" [attr.transform]="'translate(' + (node.width! - 25) + ', 5)'"
+            (click)="toggleGroup($event, node)">
+            <rect width="20" height="20" rx="4" class="ngx-flow__group-toggle-bg"></rect>
+            <path [attr.d]="node.expanded ? 'M 5 10 L 15 10' : 'M 5 10 L 15 10 M 10 5 L 10 15'"
+              class="ngx-flow__group-toggle-icon"></path>
+          </g>
+        </g>
       </g>
 
+      <!-- Alignment Guides -->
+      <g *ngFor="let guide of alignmentGuides()" class="ngx-flow__alignment-guide">
+        <line *ngIf="guide.type === 'horizontal'" [attr.x1]="guide.start" [attr.y1]="guide.position"
+          [attr.x2]="guide.end" [attr.y2]="guide.position" />
+        <line *ngIf="guide.type === 'vertical'" [attr.x1]="guide.position" [attr.y1]="guide.start"
+          [attr.x2]="guide.position" [attr.y2]="guide.end" />
+      </g>
     </g>
+
   </svg>
 
-  <!-- Zoom Controls (outside SVG for better event handling) -->
   <ngx-zoom-controls *ngIf="showZoomControls" [zoom]="viewport().zoom" [minZoom]="0.1" [maxZoom]="4" (zoomIn)="zoomIn()"
     (zoomOut)="zoomOut()" (fitView)="fitView()" (resetZoom)="resetZoom()">
   </ngx-zoom-controls>

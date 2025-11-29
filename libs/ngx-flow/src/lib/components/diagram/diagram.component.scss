@@ -425,3 +425,14 @@
     background-color: #eee;
   }
 }
+
+/* Alignment Guide Styles */
+.ngx-flow__alignment-guide {
+  pointer-events: none;
+  
+  line {
+    stroke: #ff0000;
+    stroke-width: 1;
+    stroke-dasharray: 4 2;
+  }
+}

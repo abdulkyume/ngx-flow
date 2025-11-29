@@ -7,7 +7,7 @@ import {
   ElementRef,
   effect,
 } from '@angular/core';
-import { Node, Edge, Viewport, XYPosition, DiagramState } from '../models';
+import { Node, Edge, Viewport, XYPosition, DiagramState, AlignmentGuide } from '../models';
 import { Observable, Subject, animationFrameScheduler } from 'rxjs';
 import { throttleTime } from 'rxjs/operators';
 import { v4 as uuidv4 } from 'uuid';
@@ -36,6 +36,7 @@ export class DiagramStateService {
   readonly edges: WritableSignal<Edge[]> = signal<Edge[]>([]);
   readonly tempEdges: WritableSignal<TempEdge[]> = signal<TempEdge[]>([]); // New signal for preview edges
   readonly viewport: WritableSignal<Viewport> = signal<Viewport>({ x: 0, y: 0, zoom: 1 });
+  readonly alignmentGuides = signal<AlignmentGuide[]>([]);
 
   // Reference to the main SVG element, set by DiagramComponent
   el!: ElementRef<SVGSVGElement>;
@@ -156,6 +157,7 @@ export class DiagramStateService {
   // --- Edge Management ---
 
   addEdge(edge: Edge): void {
+    console.log('DiagramStateService.addEdge: start', edge);
     this.undoRedoService.saveState(this.getCurrentState());
     this.edges.update((currentEdges) => [...currentEdges, { ...edge, selected: false }]);
     this.connect.emit({
@@ -164,6 +166,7 @@ export class DiagramStateService {
       target: edge.target,
       targetHandle: edge.targetHandle,
     });
+    console.log('DiagramStateService.addEdge: end');
   }
 
   updateEdge(id: string, changes: Partial<Edge>): void {
@@ -410,6 +413,7 @@ export class DiagramStateService {
   onDragEnd(node: Node): void {
     this.dragEnd.emit(node);
     this.updateNode(node.id, { dragging: false });
+    this.alignmentGuides.set([]); // Clear alignment guides
     // State is already saved at dragStart, so no need to save again here unless
     // a single drag operation is considered a single undoable action.
     // If multiple small state changes during drag need to be undone as one,
@@ -584,6 +588,7 @@ export class DiagramStateService {
     );
   }
 
+
   toggleGroup(groupId: string): void {
     this.nodes.update((nodes) =>
       nodes.map((n) => {
@@ -595,19 +600,134 @@ export class DiagramStateService {
     );
   }
 
-  // Override moveNode to handle group children
   // Move node and handle group children
   moveNode(id: string, newPosition: XYPosition): void {
+    // console.log('moveNode', id, newPosition);
     const node = this.nodes().find((n) => n.id === id);
     if (!node) return;
 
-    const dx = newPosition.x - node.position.x;
-    const dy = newPosition.y - node.position.y;
+    // Snapping Logic
+    let snappedX = newPosition.x;
+    let snappedY = newPosition.y;
+    const guides: AlignmentGuide[] = [];
+    const SNAP_DISTANCE = 5;
+    const GRID_SIZE = 20;
+
+    // 1. Snap to Grid (lower priority)
+    snappedX = Math.round(snappedX / GRID_SIZE) * GRID_SIZE;
+    snappedY = Math.round(snappedY / GRID_SIZE) * GRID_SIZE;
+
+    // 2. Snap to Nodes (higher priority)
+    // Only snap if dragging a single node (for simplicity for now)
+    const otherNodes = this.nodes().filter(n => n.id !== id && n.parentId === node.parentId && !n.selected);
+
+    let snappedXNode = false;
+    let snappedYNode = false;
+
+    // Horizontal Alignment (aligning Y coordinates)
+    // Check Top, Center, Bottom
+    const myHeight = node.height || 150; // Default height
+    const myCenterY = newPosition.y + myHeight / 2;
+    const myBottomY = newPosition.y + myHeight;
+
+    for (const other of otherNodes) {
+      const otherHeight = other.height || 150;
+      const otherY = other.position.y;
+      const otherCenterY = otherY + otherHeight / 2;
+      const otherBottomY = otherY + otherHeight;
+
+      // Top to Top
+      if (Math.abs(newPosition.y - otherY) < SNAP_DISTANCE) {
+        snappedY = otherY;
+        snappedYNode = true;
+        guides.push({ type: 'horizontal', position: otherY, start: Math.min(newPosition.x, other.position.x), end: Math.max(newPosition.x + (node.width || 150), other.position.x + (other.width || 150)) });
+      }
+      // Top to Bottom
+      else if (Math.abs(newPosition.y - otherBottomY) < SNAP_DISTANCE) {
+        snappedY = otherBottomY;
+        snappedYNode = true;
+        guides.push({ type: 'horizontal', position: otherBottomY, start: Math.min(newPosition.x, other.position.x), end: Math.max(newPosition.x + (node.width || 150), other.position.x + (other.width || 150)) });
+      }
+      // Center to Center
+      else if (Math.abs(myCenterY - otherCenterY) < SNAP_DISTANCE) {
+        snappedY = otherCenterY - myHeight / 2;
+        snappedYNode = true;
+        guides.push({ type: 'horizontal', position: otherCenterY, start: Math.min(newPosition.x, other.position.x), end: Math.max(newPosition.x + (node.width || 150), other.position.x + (other.width || 150)) });
+      }
+      // Bottom to Top
+      else if (Math.abs(myBottomY - otherY) < SNAP_DISTANCE) {
+        snappedY = otherY - myHeight;
+        snappedYNode = true;
+        guides.push({ type: 'horizontal', position: otherY, start: Math.min(newPosition.x, other.position.x), end: Math.max(newPosition.x + (node.width || 150), other.position.x + (other.width || 150)) });
+      }
+      // Bottom to Bottom
+      else if (Math.abs(myBottomY - otherBottomY) < SNAP_DISTANCE) {
+        snappedY = otherBottomY - myHeight;
+        snappedYNode = true;
+        guides.push({ type: 'horizontal', position: otherBottomY, start: Math.min(newPosition.x, other.position.x), end: Math.max(newPosition.x + (node.width || 150), other.position.x + (other.width || 150)) });
+      }
+
+      if (snappedYNode) break; // Snap to first match
+    }
+
+    // Vertical Alignment (aligning X coordinates)
+    // Check Left, Center, Right
+    const myWidth = node.width || 150; // Default width
+    const myCenterX = newPosition.x + myWidth / 2;
+    const myRightX = newPosition.x + myWidth;
+
+    for (const other of otherNodes) {
+      const otherWidth = other.width || 150;
+      const otherX = other.position.x;
+      const otherCenterX = otherX + otherWidth / 2;
+      const otherRightX = otherX + otherWidth;
+
+      // Left to Left
+      if (Math.abs(newPosition.x - otherX) < SNAP_DISTANCE) {
+        snappedX = otherX;
+        snappedXNode = true;
+        guides.push({ type: 'vertical', position: otherX, start: Math.min(newPosition.y, other.position.y), end: Math.max(newPosition.y + (node.height || 60), other.position.y + (other.height || 60)) });
+      }
+      // Left to Right
+      else if (Math.abs(newPosition.x - otherRightX) < SNAP_DISTANCE) {
+        snappedX = otherRightX;
+        snappedXNode = true;
+        guides.push({ type: 'vertical', position: otherRightX, start: Math.min(newPosition.y, other.position.y), end: Math.max(newPosition.y + (node.height || 60), other.position.y + (other.height || 60)) });
+      }
+      // Center to Center
+      else if (Math.abs(myCenterX - otherCenterX) < SNAP_DISTANCE) {
+        snappedX = otherCenterX - myWidth / 2;
+        snappedXNode = true;
+        guides.push({ type: 'vertical', position: otherCenterX, start: Math.min(newPosition.y, other.position.y), end: Math.max(newPosition.y + (node.height || 60), other.position.y + (other.height || 60)) });
+      }
+      // Right to Left
+      else if (Math.abs(myRightX - otherX) < SNAP_DISTANCE) {
+        snappedX = otherX - myWidth;
+        snappedXNode = true;
+        guides.push({ type: 'vertical', position: otherX, start: Math.min(newPosition.y, other.position.y), end: Math.max(newPosition.y + (node.height || 60), other.position.y + (other.height || 60)) });
+      }
+      // Right to Right
+      else if (Math.abs(myRightX - otherRightX) < SNAP_DISTANCE) {
+        snappedX = otherRightX - myWidth;
+        snappedXNode = true;
+        guides.push({ type: 'vertical', position: otherRightX, start: Math.min(newPosition.y, other.position.y), end: Math.max(newPosition.y + (node.height || 60), other.position.y + (other.height || 60)) });
+      }
+
+      if (snappedXNode) break;
+    }
+
+    // this.alignmentGuides.set(guides);
+
+    const finalPosition = { x: snappedX, y: snappedY };
+    const dx = finalPosition.x - node.position.x;
+    const dy = finalPosition.y - node.position.y;
+
+    if (dx === 0 && dy === 0) return;
 
     // Update the moved node
     const updatedNodes = this.nodes().map((n) => {
       if (n.id === id) {
-        return { ...n, position: newPosition };
+        return { ...n, position: finalPosition };
       }
       return n;
     });
@@ -620,7 +740,13 @@ export class DiagramStateService {
     this.nodes.set(updatedNodes);
   }
 
-  private moveChildren(parentId: string, dx: number, dy: number, nodes: Node[]): void {
+  private moveChildren(parentId: string, dx: number, dy: number, nodes: Node[], visited = new Set<string>()): void {
+    if (visited.has(parentId)) {
+      console.warn('Cycle detected in group hierarchy, stopping recursion for', parentId);
+      return;
+    }
+    visited.add(parentId);
+
     for (let i = 0; i < nodes.length; i++) {
       if (nodes[i].parentId === parentId) {
         nodes[i] = {
@@ -632,26 +758,34 @@ export class DiagramStateService {
         };
         // Recursively move children of children (nested groups)
         if (nodes[i].type === 'group') {
-          this.moveChildren(nodes[i].id, dx, dy, nodes);
+          this.moveChildren(nodes[i].id, dx, dy, nodes, visited);
         }
       }
     }
   }
 
-  // Override moveNodes for batch movement
   // Move multiple nodes (batch movement)
   moveNodes(moves: { id: string; position: XYPosition }[]): void {
+    console.log('moveNodes', moves.length);
+    const GRID_SIZE = 20;
+
     let currentNodes = [...this.nodes()];
+    this.alignmentGuides.set([]); // Clear guides during batch move for now
 
     moves.forEach(move => {
       const node = currentNodes.find(n => n.id === move.id);
       if (!node) return;
 
-      const dx = move.position.x - node.position.x;
-      const dy = move.position.y - node.position.y;
+      // Simple grid snap for batch move
+      const snappedX = Math.round(move.position.x / GRID_SIZE) * GRID_SIZE;
+      const snappedY = Math.round(move.position.y / GRID_SIZE) * GRID_SIZE;
+      const finalPosition = { x: snappedX, y: snappedY };
+
+      const dx = finalPosition.x - node.position.x;
+      const dy = finalPosition.y - node.position.y;
 
       // Update parent node
-      currentNodes = currentNodes.map(n => n.id === move.id ? { ...n, position: move.position } : n);
+      currentNodes = currentNodes.map(n => n.id === move.id ? { ...n, position: finalPosition } : n);
 
       // If group, move children
       if (node.type === 'group') {

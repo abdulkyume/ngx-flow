@@ -8,14 +8,14 @@ export class UndoRedoService {
   private undoStack: WritableSignal<DiagramState[]> = signal([]);
   private redoStack: WritableSignal<DiagramState[]> = signal([]);
 
-  constructor() {}
+  constructor() { }
 
   // Saves the current state of the diagram to the undo stack
   saveState(currentState: DiagramState): void {
     this.undoStack.update((stack) => [...stack, currentState]);
     this.redoStack.set([]); // Clear redo stack on new action
-    console.log('State saved:', currentState);
-    console.log('Undo Stack size:', this.undoStack().length);
+    // console.log('State saved');
+    // console.log('Undo Stack size:', this.undoStack().length);
   }
 
   // Undoes the last action

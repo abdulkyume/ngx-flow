@@ -8,6 +8,85 @@ interface GridNode {
     h: number; // Heuristic cost to end
     f: number; // Total cost
     parent: GridNode | null;
+    opened: boolean;
+    closed: boolean;
+}
+
+class MinHeap {
+    private heap: GridNode[] = [];
+
+    push(node: GridNode): void {
+        this.heap.push(node);
+        this.bubbleUp(this.heap.length - 1);
+    }
+
+    pop(): GridNode | undefined {
+        if (this.heap.length === 0) return undefined;
+        const top = this.heap[0];
+        const bottom = this.heap.pop();
+        if (this.heap.length > 0 && bottom) {
+            this.heap[0] = bottom;
+            this.sinkDown(0);
+        }
+        return top;
+    }
+
+    size(): number {
+        return this.heap.length;
+    }
+
+    private bubbleUp(index: number): void {
+        const element = this.heap[index];
+        while (index > 0) {
+            const parentIndex = Math.floor((index - 1) / 2);
+            const parent = this.heap[parentIndex];
+            if (element.f >= parent.f) break;
+            this.heap[parentIndex] = element;
+            this.heap[index] = parent;
+            index = parentIndex;
+        }
+    }
+
+    private sinkDown(index: number): void {
+        const length = this.heap.length;
+        const element = this.heap[index];
+        while (true) {
+            const leftChildIndex = 2 * index + 1;
+            const rightChildIndex = 2 * index + 2;
+            let leftChild: GridNode | undefined, rightChild: GridNode | undefined;
+            let swap = null;
+
+            if (leftChildIndex < length) {
+                leftChild = this.heap[leftChildIndex];
+                if (leftChild.f < element.f) {
+                    swap = leftChildIndex;
+                }
+            }
+
+            if (rightChildIndex < length) {
+                rightChild = this.heap[rightChildIndex];
+                if (
+                    (swap === null && rightChild.f < element.f) ||
+                    (swap !== null && rightChild.f < leftChild!.f)
+                ) {
+                    swap = rightChildIndex;
+                }
+            }
+
+            if (swap === null) break;
+            this.heap[index] = this.heap[swap];
+            this.heap[swap] = element;
+            index = swap;
+        }
+    }
+
+    rescoreElement(node: GridNode): void {
+        const index = this.heap.indexOf(node);
+        if (index !== -1) {
+            // Since f usually decreases in A*, we bubble up
+            this.bubbleUp(index);
+        }
+    }
 }
 
 export class PathFinder {
@@ -62,7 +141,9 @@ export class PathFinder {
                     g: 0,
                     h: 0,
                     f: 0,
-                    parent: null
+                    parent: null,
+                    opened: false,
+                    closed: false
                 });
             }
             this.grid.push(row);
@@ -94,75 +175,107 @@ export class PathFinder {
             return [start, end]; // Fallback to straight line
         }
 
+        // Reset grid state for new search (optimization: use a search ID instead of clearing all?)
+        // For now, simple reset is safer, but O(W*H). 
+        // Optimization: Only reset nodes we touch? 
+        // Let's iterate over the grid to reset. This is slow if grid is huge.
+        // Better: Use a 'visitedToken' on GridNode and increment it per search.
+        // But I can't easily change GridNode interface without touching everything.
+        // Let's stick to resetting for now, but maybe optimize later.
+        // Actually, since we create a NEW PathFinder on drag stop, the grid is fresh.
+        // But findPath is called multiple times (once per edge).
+        // So we MUST reset.
+        // Optimization: Keep a list of visited nodes and reset only them.
+
+        // We'll use a `resetList` to track modified nodes and reset them at the end.
+        const resetList: GridNode[] = [];
+
         const startNode = this.grid[startGridY][startGridX];
         const endNode = this.grid[endGridY][endGridX];
 
-        // Temporarily make start and end walkable if they are inside a node (e.g. handle is on the edge)
+        // Temporarily make start and end walkable
         const startWasWalkable = startNode.walkable;
         const endWasWalkable = endNode.walkable;
         startNode.walkable = true;
         endNode.walkable = true;
+        resetList.push(startNode, endNode);
 
-        const openList: GridNode[] = [startNode];
-        const closedList: Set<GridNode> = new Set();
+        const openList = new MinHeap();
+        startNode.g = 0;
+        startNode.h = Math.abs(startNode.x - endNode.x) + Math.abs(startNode.y - endNode.y);
+        startNode.f = startNode.g + startNode.h;
+        startNode.opened = true;
+        openList.push(startNode);
+        resetList.push(startNode);
 
-        while (openList.length > 0) {
-            // Sort by f cost
-            openList.sort((a, b) => a.f - b.f);
-            const currentNode = openList.shift()!;
+        let pathFound = false;
+
+        while (openList.size() > 0) {
+            const currentNode = openList.pop()!;
+            currentNode.closed = true;
 
             if (currentNode === endNode) {
-                // Path found
-                const path: XYPosition[] = [];
-                let curr: GridNode | null = currentNode;
-                while (curr) {
-                    path.unshift({
-                        x: curr.x * this.gridSize + this.bounds.minX + this.gridSize / 2,
-                        y: curr.y * this.gridSize + this.bounds.minY + this.gridSize / 2
-                    });
-                    curr = curr.parent;
-                }
-
-                // Replace start and end with exact coordinates
-                path[0] = start;
-                path[path.length - 1] = end;
-
-                // Restore walkability
-                startNode.walkable = startWasWalkable;
-                endNode.walkable = endWasWalkable;
-
-                return this.simplifyPath(path);
+                pathFound = true;
+                break;
             }
-
-            closedList.add(currentNode);
 
             const neighbors = this.getNeighbors(currentNode);
             for (const neighbor of neighbors) {
-                if (closedList.has(neighbor) || !neighbor.walkable) {
+                if (neighbor.closed || !neighbor.walkable) {
                     continue;
                 }
 
-                const gScore = currentNode.g + 1; // Assuming uniform cost
-                const hScore = Math.abs(neighbor.x - endNode.x) + Math.abs(neighbor.y - endNode.y); // Manhattan distance
+                const gScore = currentNode.g + 1;
 
-                const existingOpenNode = openList.find(n => n === neighbor);
-                if (!existingOpenNode || gScore < neighbor.g) {
+                if (!neighbor.opened || gScore < neighbor.g) {
                     neighbor.g = gScore;
-                    neighbor.h = hScore;
-                    neighbor.f = gScore + hScore;
+                    neighbor.h = Math.abs(neighbor.x - endNode.x) + Math.abs(neighbor.y - endNode.y);
+                    neighbor.f = neighbor.g + neighbor.h;
                     neighbor.parent = currentNode;
 
-                    if (!existingOpenNode) {
+                    if (!neighbor.opened) {
+                        neighbor.opened = true;
                         openList.push(neighbor);
+                        resetList.push(neighbor);
+                    } else {
+                        openList.rescoreElement(neighbor);
                     }
                 }
             }
         }
 
-        // No path found
+        let resultPath: XYPosition[] = [start, end];
+
+        if (pathFound) {
+            const path: XYPosition[] = [];
+            let curr: GridNode | null = endNode;
+            while (curr) {
+                path.unshift({
+                    x: curr.x * this.gridSize + this.bounds.minX + this.gridSize / 2,
+                    y: curr.y * this.gridSize + this.bounds.minY + this.gridSize / 2
+                });
+                curr = curr.parent;
+            }
+            path[0] = start;
+            path[path.length - 1] = end;
+            resultPath = this.simplifyPath(path);
+        }
+
+        // Cleanup
         startNode.walkable = startWasWalkable;
         endNode.walkable = endWasWalkable;
-        return [start, end];
+
+        // Reset modified nodes
+        for (const node of resetList) {
+            node.g = 0;
+            node.h = 0;
+            node.f = 0;
+            node.parent = null;
+            node.opened = false;
+            node.closed = false;
+        }
+
+        return resultPath;
     }
 
     private isValid(x: number, y: number): boolean {
@@ -189,15 +302,10 @@ export class PathFinder {
         if (path.length <= 2) return path;
 
         const simplified: XYPosition[] = [path[0]];
-        let lastPoint = path[0];
-        let direction = { x: 0, y: 0 };
-
-        if (path.length > 1) {
-            direction = {
-                x: Math.sign(path[1].x - path[0].x),
-                y: Math.sign(path[1].y - path[0].y)
-            };
-        }
+        let direction = {
+            x: Math.sign(path[1].x - path[0].x),
+            y: Math.sign(path[1].y - path[0].y)
+        };
 
         for (let i = 1; i < path.length - 1; i++) {
             const nextPoint = path[i + 1];

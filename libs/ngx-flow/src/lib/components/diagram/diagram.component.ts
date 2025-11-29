@@ -1,8 +1,9 @@
-import { Component, ChangeDetectionStrategy, ElementRef, OnInit, Renderer2, NgZone, OnDestroy, HostListener, WritableSignal, Inject, Optional, computed, ViewChild, Input, Output, EventEmitter, OnChanges, SimpleChanges } from '@angular/core';
+import { Component, ChangeDetectionStrategy, ElementRef, OnInit, Renderer2, NgZone, OnDestroy, HostListener, WritableSignal, Inject, Optional, computed, ViewChild, Input, Output, EventEmitter, OnChanges, SimpleChanges, Signal, ChangeDetectorRef } from '@angular/core';
+import { toObservable } from '@angular/core/rxjs-interop';
 import { CommonModule, NgComponentOutlet } from '@angular/common';
 import { DiagramStateService } from '../../services/diagram-state.service';
-import { Viewport, XYPosition, Node, Edge, TempEdge, DiagramState } from '../../models';
-import { Subscription } from 'rxjs';
+import { Viewport, XYPosition, Node, Edge, TempEdge, DiagramState, AlignmentGuide } from '../../models';
+import { Subscription, Observable } from 'rxjs';
 import { NGX_FLOW_NODE_TYPES } from '../../injection-tokens';
 import { NodeComponentType } from '../../types';
 import { getBezierPath, getStraightPath, getStepPath, getSelfLoopPath, getSmartEdgePath, PathFinder, getPolylineMidpoint } from '../../utils';
@@ -57,7 +58,7 @@ function getHandleAbsolutePosition(node: Node, handleId: string | undefined): XY
   styleUrls: ['./diagram.component.scss'],
   changeDetection: ChangeDetectionStrategy.OnPush,
   standalone: true,
-  imports: [CommonModule, NgComponentOutlet, ZoomControlsComponent, MinimapComponent, BackgroundComponent, AlignmentControlsComponent]
+  imports: [CommonModule, ZoomControlsComponent, MinimapComponent, BackgroundComponent, AlignmentControlsComponent]
 })
 export class DiagramComponent implements OnInit, OnDestroy, OnChanges {
   // Trigger rebuild
@@ -91,32 +92,22 @@ export class DiagramComponent implements OnInit, OnDestroy, OnChanges {
   nodes!: WritableSignal<Node[]>;
   edges!: WritableSignal<Edge[]>;
   tempEdges!: WritableSignal<TempEdge[]>;
+  alignmentGuides!: Signal<AlignmentGuide[]>;
 
   // Expose Math to the template
   Math = Math;
 
+  private _pathFinder: PathFinder | null = null;
   private pathCache = new Map<string, string>();
+  private dragAnimationFrameId: number | null = null;
+  private unlistenPointerMove: (() => void) | null = null;
+  private unlistenPointerUp: (() => void) | null = null;
+  private unlistenPointerLeave: (() => void) | null = null;
   private pathPointsCache = new Map<string, XYPosition[]>();
-
-  private pathFinder = computed(() => {
-    // Clear cache when nodes change (grid changes)
-    this.pathCache.clear();
-    this.pathPointsCache.clear();
-
-    const nodes = this.nodes();
-    return new PathFinder(nodes.map(n => ({
-      x: n.position.x,
-      y: n.position.y,
-      width: n.width || 170,
-      height: n.height || 60,
-      id: n.id
-    })));
-  });
 
   private isPanning = false;
   private lastPanPosition: XYPosition = { x: 0, y: 0 };
   private subscriptions = new Subscription();
-
   // Lasso selection properties
   isSelecting = false;
   selectionStart: XYPosition = { x: 0, y: 0 };
@@ -151,6 +142,18 @@ export class DiagramComponent implements OnInit, OnDestroy, OnChanges {
 
   // Edge Label Editing
   editingEdgeId: string | null = null;
+
+  private updatePathFinder(nodes: Node[]): void {
+    this.pathCache.clear();
+    this.pathPointsCache.clear();
+    this._pathFinder = new PathFinder(nodes.map(n => ({
+      id: n.id,
+      x: n.position.x,
+      y: n.position.y,
+      width: n.width || this.defaultNodeWidth,
+      height: n.height || this.defaultNodeHeight
+    })));
+  }
 
   onEdgeDoubleClick(event: MouseEvent, edge: Edge): void {
     event.stopPropagation();
@@ -195,18 +198,22 @@ export class DiagramComponent implements OnInit, OnDestroy, OnChanges {
     private el: ElementRef<HTMLElement>, // Host element
     private renderer: Renderer2,
     private ngZone: NgZone,
+    private cdRef: ChangeDetectorRef,
     private diagramStateService: DiagramStateService,
     @Optional() @Inject(NGX_FLOW_NODE_TYPES) private nodeTypes: Record<string, NodeComponentType> | null
-  ) { }
+  ) {
+    this.nodes$ = toObservable(this.diagramStateService.nodes);
+  }
 
+  private nodes$: Observable<Node[]>;
   ngOnInit(): void {
     this.diagramStateService.el = this.svgRef;
     this.viewport = this.diagramStateService.viewport;
     this.nodes = this.diagramStateService.nodes;
     this.edges = this.diagramStateService.edges;
     this.tempEdges = this.diagramStateService.tempEdges;
+    this.alignmentGuides = this.diagramStateService.alignmentGuides;
 
-    // Set initial data if provided
     if (this.initialNodes.length > 0) {
       this.initialNodes.forEach(node => this.diagramStateService.addNode(node));
     }
@@ -219,7 +226,6 @@ export class DiagramComponent implements OnInit, OnDestroy, OnChanges {
     }
 
     // Subscribe to state changes and emit events
-    // Note: We only subscribe to connect events from user interactions, not programmatic additions
     this.subscriptions.add(
       this.diagramStateService.nodeClick.subscribe((node: Node) => this.nodeClick.emit(node))
     );
@@ -230,42 +236,52 @@ export class DiagramComponent implements OnInit, OnDestroy, OnChanges {
       this.diagramStateService.connect.subscribe((connection) => this.connect.emit(connection))
     );
     this.subscriptions.add(
-      this.diagramStateService.nodesChange.subscribe((nodes: Node[]) => this.nodesChange.emit(nodes))
+      this.nodes$.subscribe(nodes => {
+        this.nodes.set(nodes);
+        if (!this.isDraggingNode) {
+          this.updatePathFinder(nodes);
+          this.nodesChange.emit(nodes);
+        }
+      })
     );
     this.subscriptions.add(
       this.diagramStateService.edgesChange.subscribe((edges: Edge[]) => this.edgesChange.emit(edges))
     );
+
+    this.ngZone.runOutsideAngular(() => {
+      this.unlistenPointerMove = this.renderer.listen(this.svgRef.nativeElement, 'pointermove', (event: PointerEvent) => {
+        this.onPointerMove(event);
+      });
+      this.unlistenPointerUp = this.renderer.listen(this.svgRef.nativeElement, 'pointerup', (event: PointerEvent) => {
+        this.onPointerUp(event);
+      });
+      this.unlistenPointerLeave = this.renderer.listen(this.svgRef.nativeElement, 'pointerleave', (event: PointerEvent) => {
+        this.onPointerLeave(event);
+      });
+    });
   }
 
   ngOnChanges(changes: SimpleChanges): void {
     // Handle changes to input properties after initialization
     if (changes['initialNodes'] && !changes['initialNodes'].firstChange) {
+      if (this.isDraggingNode || this.draggingNode) {
+        return;
+      }
       const currentNodes = this.nodes();
-
-      // Optimization: If the array reference is the same, do nothing.
-      // This happens when the parent updates the input with the same array emitted by nodesChange.
       if (this.initialNodes === currentNodes) {
         return;
       }
-
-      // Sync nodes: add new ones, remove deleted ones, update existing ones
       const currentNodeIds = new Set(currentNodes.map(n => n.id));
       const newNodeIds = new Set(this.initialNodes.map(n => n.id));
-
-      // Remove nodes that are no longer in initialNodes
       currentNodes.forEach(node => {
         if (!newNodeIds.has(node.id)) {
           this.diagramStateService.removeNode(node.id);
         }
       });
-
-      // Add or update nodes from initialNodes
       this.initialNodes.forEach(node => {
         if (!currentNodeIds.has(node.id)) {
-          // New node - add it
           this.diagramStateService.addNode(node);
         } else {
-          // Existing node - update it ONLY if it changed
           const currentNode = currentNodes.find(n => n.id === node.id);
           if (currentNode && JSON.stringify(currentNode) !== JSON.stringify(node)) {
             this.diagramStateService.updateNode(node.id, node);
@@ -276,10 +292,7 @@ export class DiagramComponent implements OnInit, OnDestroy, OnChanges {
     if (changes['initialEdges'] && !changes['initialEdges'].firstChange) {
       const currentEdges = this.edges();
       if (this.initialEdges === currentEdges) return;
-
-      // Check if edges actually changed content-wise
       if (JSON.stringify(this.initialEdges) !== JSON.stringify(currentEdges)) {
-        // Set edges directly without triggering connect events
         this.diagramStateService.edges.set([...this.initialEdges]);
       }
     }
@@ -293,6 +306,9 @@ export class DiagramComponent implements OnInit, OnDestroy, OnChanges {
 
   ngOnDestroy(): void {
     this.subscriptions.unsubscribe();
+    if (this.unlistenPointerMove) this.unlistenPointerMove();
+    if (this.unlistenPointerUp) this.unlistenPointerUp();
+    if (this.unlistenPointerLeave) this.unlistenPointerLeave();
   }
 
   get transform(): string {
@@ -605,6 +621,7 @@ export class DiagramComponent implements OnInit, OnDestroy, OnChanges {
   }
 
   private finishConnecting(event: PointerEvent): void {
+    console.log('finishConnecting: start');
     event.stopPropagation();
     event.preventDefault();
 
@@ -613,12 +630,14 @@ export class DiagramComponent implements OnInit, OnDestroy, OnChanges {
     this.clearTargetHandleHighlight();
 
     if (this.currentPreviewEdgeId) {
+      console.log('finishConnecting: removing preview edge');
       this.diagramStateService.removeEdge(this.currentPreviewEdgeId);
     }
 
     if (this.currentTargetHandle && this.connectingSourceNodeId) {
       const sourceId = this.connectingSourceNodeId;
       const targetId = this.currentTargetHandle.nodeId;
+      console.log('finishConnecting: attempting connection', { sourceId, targetId });
 
       if (this.isValidConnection(sourceId, targetId)) {
         const newEdge: Edge = {
@@ -629,8 +648,10 @@ export class DiagramComponent implements OnInit, OnDestroy, OnChanges {
           targetHandle: this.currentTargetHandle.handleId,
           // type: 'bezier', // Removed to use default smart routing
         };
+        console.log('finishConnecting: adding edge', newEdge);
         this.diagramStateService.addEdge(newEdge);
       } else {
+        console.log('finishConnecting: invalid connection');
         // Visual feedback for invalid connection: flash source node
         const sourceNodeEl = this.el.nativeElement.querySelector(`[data-nodeid="${sourceId}"]`);
         if (sourceNodeEl) {
@@ -644,6 +665,7 @@ export class DiagramComponent implements OnInit, OnDestroy, OnChanges {
     this.currentTargetHandle = null;
     this.connectingSourceNodeId = null;
     this.connectingSourceHandleId = undefined;
+    console.log('finishConnecting: end');
   }
 
   private clearTargetHandleHighlight(): void {
@@ -678,13 +700,19 @@ export class DiagramComponent implements OnInit, OnDestroy, OnChanges {
     }
 
     this.diagramStateService.onDragStart(node);
+    console.log('startDraggingNode: started for', node.id);
   }
 
   private dragNode(event: PointerEvent): void {
     if (!this.draggingNode) return;
     event.stopPropagation();
 
-    this.ngZone.runOutsideAngular(() => {
+    if (this.dragAnimationFrameId) {
+      cancelAnimationFrame(this.dragAnimationFrameId);
+    }
+
+    this.dragAnimationFrameId = requestAnimationFrame(() => {
+      if (!this.draggingNode) return;
       const zoom = this.viewport().zoom;
       const deltaX = (event.clientX - this.startPointerPosition.x) / zoom;
       const deltaY = (event.clientY - this.startPointerPosition.y) / zoom;
@@ -710,6 +738,8 @@ export class DiagramComponent implements OnInit, OnDestroy, OnChanges {
         };
         this.diagramStateService.moveNode(this.draggingNode!.id, newPosition);
       }
+      this.cdRef.detectChanges();
+      this.dragAnimationFrameId = null;
     });
   }
 
@@ -717,16 +747,25 @@ export class DiagramComponent implements OnInit, OnDestroy, OnChanges {
     if (!this.draggingNode) return;
     event.stopPropagation();
     this.isDraggingNode = false;
+    this.updatePathFinder(this.nodes());
+    if (this.dragAnimationFrameId) {
+      cancelAnimationFrame(this.dragAnimationFrameId);
+      this.dragAnimationFrameId = null;
+    }
     this.svgRef.nativeElement.releasePointerCapture(event.pointerId);
 
     // Trigger onDragEnd for all dragged nodes
     this.draggingNodes.forEach(node => {
       this.diagramStateService.onDragEnd(node);
     });
+    console.log('stopDraggingNode: stopped');
 
     this.draggingNode = null;
     this.draggingNodes = [];
     this.startNodePositions.clear();
+
+    // Emit the final state after drag is complete
+    this.nodesChange.emit(this.nodes());
   }
 
   // --- Resizing Logic ---
@@ -1042,7 +1081,10 @@ export class DiagramComponent implements OnInit, OnDestroy, OnChanges {
       }
 
       try {
-        const path = this.pathFinder().findPath(sourcePos, targetPos);
+        if (!this._pathFinder) {
+          this.updatePathFinder(this.nodes());
+        }
+        const path = this._pathFinder!.findPath(sourcePos, targetPos);
         const d = getSmartEdgePath(path);
         this.pathCache.set(cacheKey, d);
         return d;
@@ -1097,7 +1139,10 @@ export class DiagramComponent implements OnInit, OnDestroy, OnChanges {
         if (this.pathPointsCache.has(cacheKey)) {
           path = this.pathPointsCache.get(cacheKey)!;
         } else {
-          path = this.pathFinder().findPath(sourcePos, targetPos);
+          if (!this._pathFinder) {
+            this.updatePathFinder(this.nodes());
+          }
+          path = this._pathFinder!.findPath(sourcePos, targetPos);
           this.pathPointsCache.set(cacheKey, path);
         }
 

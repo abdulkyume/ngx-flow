@@ -30,4 +30,5 @@ export interface Node<T = any> {
   parentId?: string;
   expanded?: boolean;
   extent?: 'parent';
+  label?: string;
 }
