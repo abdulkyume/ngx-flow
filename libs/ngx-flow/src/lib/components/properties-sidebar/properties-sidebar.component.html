@@ -1,0 +1,44 @@
+<div class="ngx-flow__sidebar" [class.open]="!!node">
+    <div class="ngx-flow__sidebar-header">
+        <h3>Node Properties</h3>
+        <button class="ngx-flow__close-btn" (click)="close.emit()">×</button>
+    </div>
+
+    <div class="ngx-flow__sidebar-content" *ngIf="node">
+        <div class="ngx-flow__form-group">
+            <label>ID</label>
+            <input type="text" [value]="node.id" disabled class="ngx-flow__input disabled">
+        </div>
+
+        <div class="ngx-flow__form-group">
+            <label>Label</label>
+            <input type="text" [ngModel]="node.label" (ngModelChange)="updateLabel($event)" class="ngx-flow__input">
+        </div>
+
+        <div class="ngx-flow__form-row">
+            <div class="ngx-flow__form-group">
+                <label>X</label>
+                <input type="number" [ngModel]="node.position.x" (ngModelChange)="updateX($event)"
+                    class="ngx-flow__input">
+            </div>
+            <div class="ngx-flow__form-group">
+                <label>Y</label>
+                <input type="number" [ngModel]="node.position.y" (ngModelChange)="updateY($event)"
+                    class="ngx-flow__input">
+            </div>
+        </div>
+
+        <div class="ngx-flow__form-row">
+            <div class="ngx-flow__form-group">
+                <label>Width</label>
+                <input type="number" [ngModel]="node.width || 170" (ngModelChange)="updateWidth($event)"
+                    class="ngx-flow__input">
+            </div>
+            <div class="ngx-flow__form-group">
+                <label>Height</label>
+                <input type="number" [ngModel]="node.height || 60" (ngModelChange)="updateHeight($event)"
+                    class="ngx-flow__input">
+            </div>
+        </div>
+    </div>
+</div>

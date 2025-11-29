@@ -64,6 +64,14 @@
     pointer-events: all;
   }
 
+  .ngx-flow__node-label {
+    font-size: 12px;
+    font-weight: 500;
+    fill: var(--ngx-flow-text-primary);
+    pointer-events: none;
+    user-select: none;
+  }
+
   /* Hover State */
   &:hover .ngx-flow__node-rect {
     stroke: var(--ngx-flow-primary);

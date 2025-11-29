@@ -1,7 +1,8 @@
 <div class="ngx-flow__container" [attr.data-lod]="lodLevel">
   <ngx-background *ngIf="showBackground" [variant]="backgroundVariant" [gap]="backgroundGap" [size]="backgroundSize"
     [color]="backgroundColor" [backgroundColor]="backgroundBgColor"></ngx-background>
-  <svg #svg class="ngx-flow__diagram" (wheel)="onWheel($event)" (pointerdown)="onPointerDown($event)">
+  <svg #svg class="ngx-flow__diagram" (wheel)="onWheel($event)" (pointerdown)="onPointerDown($event)"
+    (dblclick)="onDiagramDoubleClick($event)">
     <defs>
       <pattern id="ngx-flow__grid-pattern" x="0" y="0" width="20" height="20" patternUnits="userSpaceOnUse">
         <circle cx="0.5" cy="0.5" r="0.5" fill="#ccc" />
@@ -79,11 +80,20 @@
       <!-- Nodes -->
       <g *ngFor="let node of filteredNodes(); trackBy: trackByNodeId" class="ngx-flow__node" [attr.data-id]="node.id"
         [class.selected]="node.selected" [class.dragging]="node.dragging"
-        [attr.transform]="'translate(' + node.position.x + ',' + node.position.y + ')'">
+        [attr.transform]="'translate(' + node.position.x + ',' + node.position.y + ')'"
+        (dblclick)="onNodeDoubleClick($event, node)">
 
         <!-- Node outline and background (visual + dragging) -->
         <rect [attr.width]="node.width || defaultNodeWidth" [attr.height]="node.height || defaultNodeHeight" rx="3"
           ry="3" class="ngx-flow__node-rect"></rect>
+
+        <!-- Node Label -->
+        <text *ngIf="node.type !== 'group'" [attr.x]="(node.width || defaultNodeWidth) / 2"
+          [attr.y]="(node.height || defaultNodeHeight) / 2" text-anchor="middle" dominant-baseline="middle"
+          class="ngx-flow__node-label">
+          {{ node.label }}
+        </text>
+
         <!-- Hit area -->
         <circle [attr.cx]="(node.width || defaultNodeWidth) / 2" cy="-10" r="20" fill="transparent"
           pointer-events="all"></circle>
@@ -189,4 +199,7 @@
   <ngx-alignment-controls></ngx-alignment-controls>
 
   <ngx-minimap *ngIf="showMinimap"></ngx-minimap>
+
+  <ngx-properties-sidebar [node]="selectedNodeForEditing" (close)="closeSidebar()"
+    (change)="onPropertiesChange($event)"></ngx-properties-sidebar>
 </div>

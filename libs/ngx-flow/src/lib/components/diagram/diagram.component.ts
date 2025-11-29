@@ -12,6 +12,7 @@ import { ZoomControlsComponent } from '../zoom-controls/zoom-controls.component'
 import { MinimapComponent } from '../minimap/minimap.component';
 import { BackgroundComponent } from '../background/background.component';
 import { AlignmentControlsComponent } from '../alignment-controls/alignment-controls.component';
+import { PropertiesSidebarComponent } from '../properties-sidebar/properties-sidebar.component';
 
 // Helper function to get a node from the array
 function getNode(id: string, nodes: Node[]): Node | undefined {
@@ -58,7 +59,7 @@ function getHandleAbsolutePosition(node: Node, handleId: string | undefined): XY
   styleUrls: ['./diagram.component.scss'],
   changeDetection: ChangeDetectionStrategy.OnPush,
   standalone: true,
-  imports: [CommonModule, ZoomControlsComponent, MinimapComponent, BackgroundComponent, AlignmentControlsComponent]
+  imports: [CommonModule, ZoomControlsComponent, MinimapComponent, BackgroundComponent, AlignmentControlsComponent, PropertiesSidebarComponent]
 })
 export class DiagramComponent implements OnInit, OnDestroy, OnChanges {
   // Trigger rebuild
@@ -87,6 +88,10 @@ export class DiagramComponent implements OnInit, OnDestroy, OnChanges {
   @Output() connect = new EventEmitter<{ source: string; sourceHandle?: string; target: string; targetHandle?: string }>();
   @Output() nodesChange = new EventEmitter<Node[]>();
   @Output() edgesChange = new EventEmitter<Edge[]>();
+  @Output() nodeDoubleClick = new EventEmitter<Node>();
+
+  // Sidebar State
+  selectedNodeForEditing: Node | null = null;
 
   viewport!: WritableSignal<Viewport>;
   nodes!: WritableSignal<Node[]>;
@@ -161,6 +166,47 @@ export class DiagramComponent implements OnInit, OnDestroy, OnChanges {
     event.stopPropagation();
     event.preventDefault();
     this.editingEdgeId = edge.id;
+  }
+
+  onNodeDoubleClick(event: MouseEvent, node: Node): void {
+    console.log('Node double clicked:', node);
+    event.stopPropagation();
+    this.selectedNodeForEditing = node;
+    this.nodeDoubleClick.emit(node);
+    this.cdRef.detectChanges();
+  }
+
+  onDiagramDoubleClick(event: MouseEvent): void {
+    let target = event.target as Element;
+
+    // If target is SVG (likely due to capture), find the actual element under cursor
+    if (target === this.svgRef.nativeElement || target.classList.contains('ngx-flow__background')) {
+      const element = document.elementFromPoint(event.clientX, event.clientY);
+      if (element) {
+        target = element;
+      }
+    }
+
+    const nodeElement = target.closest('.ngx-flow__node');
+    if (nodeElement) {
+      const nodeId = (nodeElement as HTMLElement).dataset['id'];
+      const node = this.nodes().find(n => n.id === nodeId);
+      if (node) {
+        this.onNodeDoubleClick(event, node);
+      }
+    }
+  }
+
+  closeSidebar(): void {
+    this.selectedNodeForEditing = null;
+  }
+
+  onPropertiesChange(changes: Partial<Node>): void {
+    if (this.selectedNodeForEditing) {
+      this.diagramStateService.updateNode(this.selectedNodeForEditing.id, changes);
+      // Update local reference to keep sidebar in sync
+      this.selectedNodeForEditing = { ...this.selectedNodeForEditing, ...changes };
+    }
   }
 
   updateEdgeLabel(edge: Edge, newLabel: string): void {
