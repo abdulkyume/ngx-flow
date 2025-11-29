@@ -16,7 +16,7 @@
     "module": "preserve",
     "baseUrl": "./",
     "paths": {
-      "ngx-flow": ["libs/ngx-flow/src/public-api.ts"]
+      "ngx-workflow": ["libs/ngx-workflow/src/public-api.ts"]
     }
   },
   "angularCompilerOptions": {

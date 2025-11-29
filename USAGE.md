@@ -1,4 +1,4 @@
-# ngx-flow - Usage Examples
+# ngx-workflow - Usage Examples
 
 ## Declarative Approach (Recommended)
 
@@ -6,19 +6,19 @@ Use `@Input()` properties to pass initial data directly in the template:
 
 ```typescript
 import { Component } from '@angular/core';
-import { Node, Edge } from 'ngx-flow';
+import { Node, Edge } from 'ngx-workflow';
 
 @Component({
   selector: 'app-workflow',
   template: `
     <div style="width: 100%; height: 600px;">
-      <ngx-diagram
+      <ngx-workflow-diagram
         [initialNodes]="nodes"
         [initialEdges]="edges"
         (nodeClick)="onNodeClick($event)"
         (connect)="onConnect($event)"
         (nodesChange)="onNodesChange($event)"
-      ></ngx-diagram>
+      ></ngx-workflow-diagram>
     </div>
   `
 })
@@ -70,13 +70,13 @@ Use `DiagramStateService` for programmatic control:
 
 ```typescript
 import { Component } from '@angular/core';
-import { DiagramStateService } from 'ngx-flow';
+import { DiagramStateService } from 'ngx-workflow';
 
 @Component({
   selector: 'app-workflow',
   template: `
     <div style="width: 100%; height: 600px;">
-      <ngx-diagram></ngx-diagram>
+      <ngx-workflow-diagram></ngx-workflow-diagram>
     </div>
     <button (click)="addNode()">Add Node</button>
     <button (click)="undo()">Undo</button>

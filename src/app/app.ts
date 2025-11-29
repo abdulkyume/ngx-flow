@@ -6,19 +6,19 @@ import {
   Node,
   Edge,
   Viewport,
-  NgxFlowModule,
+  NgxWorkflowModule,
   DiagramComponent,
-} from 'ngx-flow';
+} from 'ngx-workflow';
 import { v4 as uuidv4 } from 'uuid';
 
 @Component({
   selector: 'app-root',
-  imports: [CommonModule, NgxFlowModule],
+  imports: [CommonModule, NgxWorkflowModule],
   templateUrl: './app.html',
   styleUrl: './app.css',
 })
 export class App implements OnInit {
-  title = 'ngx-flow-demo';
+  title = 'ngx-workflow-demo';
 
   // Data properties for declarative binding
   nodes: Node[] = [];

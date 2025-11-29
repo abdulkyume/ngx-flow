@@ -1,0 +1,386 @@
+/* Theme Variables */
+:host {
+  --ngx-workflow-primary: #3b82f6; /* Modern Blue */
+  --ngx-workflow-primary-hover: #2563eb;
+  --ngx-workflow-bg: #f8fafc; /* Slate 50 */
+  --ngx-workflow-surface: #ffffff;
+  --ngx-workflow-border: #e2e8f0; /* Slate 200 */
+  --ngx-workflow-text-primary: #1e293b; /* Slate 800 */
+  --ngx-workflow-text-secondary: #64748b; /* Slate 500 */
+  --ngx-workflow-shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --ngx-workflow-shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  --ngx-workflow-shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+  --ngx-workflow-glass-bg: rgba(255, 255, 255, 0.8);
+  --ngx-workflow-glass-border: rgba(255, 255, 255, 0.5);
+  --ngx-workflow-glass-blur: blur(12px);
+  
+  display: block;
+  width: 100%;
+  height: 100%;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+}
+
+.ngx-workflow__container {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background-color: var(--ngx-workflow-bg);
+}
+
+.ngx-workflow__diagram {
+  width: 100%;
+  height: 100%;
+  cursor: grab;
+  position: relative;
+  z-index: 1;
+  
+  &:active {
+    cursor: grabbing;
+  }
+}
+
+.ngx-workflow__background {
+  fill: url(#ngx-workflow__grid-pattern);
+  opacity: 0.6;
+}
+
+.ngx-workflow__viewport {
+  transform-origin: 0 0;
+}
+
+/* --- Nodes --- */
+.ngx-workflow__node {
+  cursor: grab;
+  transition: transform 0.1s ease, opacity 0.2s ease;
+
+  /* Node Body */
+  .ngx-workflow__node-rect {
+    fill: var(--ngx-workflow-surface);
+    stroke: var(--ngx-workflow-border);
+    stroke-width: 1.5px;
+    filter: drop-shadow(0 2px 4px rgba(0,0,0,0.05));
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    pointer-events: all;
+  }
+
+  .ngx-workflow__node-label {
+    font-size: 12px;
+    font-weight: 500;
+    fill: var(--ngx-workflow-text-primary);
+    pointer-events: none;
+    user-select: none;
+  }
+
+  /* Hover State */
+  &:hover .ngx-workflow__node-rect {
+    stroke: var(--ngx-workflow-primary);
+    filter: drop-shadow(0 4px 6px rgba(0,0,0,0.08));
+    transform: translateY(-1px);
+  }
+
+  /* Selected State */
+  &.selected .ngx-workflow__node-rect {
+    stroke: var(--ngx-workflow-primary);
+    stroke-width: 2px;
+    filter: drop-shadow(0 0 0 2px rgba(59, 130, 246, 0.2));
+  }
+
+  /* Dragging State */
+  &.dragging {
+    cursor: grabbing;
+    opacity: 0.9;
+    .ngx-workflow__node-rect {
+      filter: drop-shadow(0 10px 15px rgba(0,0,0,0.1));
+      transform: scale(1.02);
+    }
+  }
+
+  &.dimmed {
+    opacity: 0.4;
+  }
+}
+
+/* Node Content (ForeignObject) */
+foreignObject {
+  overflow: visible;
+  pointer-events: none; /* Let clicks pass to rect */
+  
+  /* Reset pointer events for interactive elements inside */
+  * {
+    pointer-events: auto;
+  }
+}
+
+/* --- Edges --- */
+.ngx-workflow__edge {
+  pointer-events: none;
+
+  &-path {
+    fill: none;
+    stroke: #94a3b8; /* Slate 400 */
+    stroke-width: 2;
+    transition: stroke 0.2s ease, stroke-width 0.2s ease;
+    pointer-events: stroke;
+    cursor: pointer;
+  }
+
+  &-hitbox {
+    fill: none;
+    stroke: transparent;
+    stroke-width: 20;
+    pointer-events: stroke;
+    cursor: pointer;
+  }
+
+  /* Hover State */
+  &:hover .ngx-workflow__edge-path {
+    stroke: var(--ngx-workflow-primary);
+  }
+
+  /* Selected State */
+  &.selected .ngx-workflow__edge-path {
+    stroke: var(--ngx-workflow-primary);
+    stroke-width: 3;
+    filter: drop-shadow(0 1px 2px rgba(59, 130, 246, 0.3));
+  }
+
+  &.animated .ngx-workflow__edge-path {
+    stroke-dasharray: 10;
+    animation: flowAnimation 1s linear infinite;
+  }
+}
+
+@keyframes flowAnimation {
+  from { stroke-dashoffset: 20; }
+  to { stroke-dashoffset: 0; }
+}
+
+/* --- Edge Labels --- */
+.ngx-workflow__edge-label {
+  pointer-events: none;
+  
+  &-text {
+    font-family: 'Inter', sans-serif;
+    font-size: 12px;
+    font-weight: 500;
+    fill: var(--ngx-workflow-text-secondary);
+    text-anchor: middle;
+    dominant-baseline: middle;
+  }
+
+  &-bg {
+    fill: var(--ngx-workflow-surface);
+    rx: 4;
+    ry: 4;
+    filter: drop-shadow(0 1px 2px rgba(0,0,0,0.1));
+  }
+  
+  &-input {
+    width: 100%;
+    height: 100%;
+    border: 1px solid var(--ngx-workflow-primary);
+    border-radius: 4px;
+    padding: 2px 6px;
+    font-size: 12px;
+    text-align: center;
+    background: var(--ngx-workflow-surface);
+    pointer-events: all;
+    outline: none;
+    box-shadow: var(--ngx-workflow-shadow-sm);
+  }
+}
+
+/* --- Handles --- */
+.ngx-workflow__handle {
+  opacity: 1; /* Always visible */
+  transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+  pointer-events: all;
+
+  &-circle {
+    fill: var(--ngx-workflow-surface);
+    stroke: var(--ngx-workflow-text-secondary);
+    stroke-width: 1.5;
+    transition: all 0.2s ease;
+    
+    &:hover {
+      fill: var(--ngx-workflow-primary);
+      stroke: var(--ngx-workflow-primary);
+      r: 7; /* Scale up slightly */
+    }
+  }
+
+  &.ngx-workflow__handle--valid-target .ngx-workflow__handle-circle {
+    fill: #10b981 !important; /* Emerald 500 */
+    stroke: #059669 !important;
+    r: 8;
+    stroke-width: 2;
+  }
+}
+
+/* --- Controls (Glassmorphism) --- */
+.ngx-workflow__io-controls {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  z-index: 10;
+  display: flex;
+  gap: 8px;
+  padding: 8px;
+  
+  /* Glassmorphism */
+  background: var(--ngx-workflow-glass-bg);
+  backdrop-filter: var(--ngx-workflow-glass-blur);
+  border: 1px solid var(--ngx-workflow-glass-border);
+  border-radius: 12px;
+  box-shadow: var(--ngx-workflow-shadow-md);
+  
+  align-items: center;
+
+  input[type="text"] {
+    padding: 6px 12px;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    font-size: 13px;
+    background: rgba(0,0,0,0.05);
+    transition: all 0.2s ease;
+    width: 160px;
+    
+    &:focus {
+      background: white;
+      border-color: var(--ngx-workflow-primary);
+      outline: none;
+      box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.1);
+    }
+  }
+
+  select {
+    padding: 6px 12px;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    font-size: 13px;
+    background: rgba(0,0,0,0.05);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    
+    &:hover {
+      background: rgba(0,0,0,0.08);
+    }
+    
+    &:focus {
+      outline: none;
+      border-color: var(--ngx-workflow-primary);
+    }
+  }
+
+  .ngx-workflow__separator {
+    width: 1px;
+    height: 24px;
+    background: rgba(0,0,0,0.1);
+    margin: 0 4px;
+  }
+
+  button {
+    padding: 6px 12px;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--ngx-workflow-text-primary);
+    transition: all 0.2s ease;
+
+    &:hover {
+      background: rgba(0,0,0,0.05);
+      color: var(--ngx-workflow-primary);
+    }
+    
+    &:active {
+      transform: translateY(1px);
+    }
+  }
+}
+
+/* --- Group Nodes --- */
+.ngx-workflow__group-node {
+  .ngx-workflow__group-header {
+    fill: rgba(0,0,0,0.03);
+    stroke: none;
+  }
+  
+  .ngx-workflow__group-label {
+    font-family: 'Inter', sans-serif;
+    font-size: 11px;
+    font-weight: 600;
+    fill: var(--ngx-workflow-text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  
+  .ngx-workflow__group-toggle {
+    cursor: pointer;
+    opacity: 0.6;
+    transition: opacity 0.2s;
+    
+    &:hover {
+      opacity: 1;
+    }
+    
+    &-bg {
+      fill: rgba(0,0,0,0.1);
+    }
+    
+    &-icon {
+      stroke: var(--ngx-workflow-text-secondary);
+      stroke-width: 1.5;
+      fill: none;
+    }
+  }
+}
+
+/* --- Alignment Guides --- */
+.ngx-workflow__alignment-guide {
+  pointer-events: none;
+  line {
+    stroke: #ec4899; /* Pink 500 */
+    stroke-width: 1;
+    stroke-dasharray: 4 4;
+    opacity: 0.8;
+  }
+}
+
+/* --- Resize Handles --- */
+.ngx-workflow__resize-handle {
+  fill: var(--ngx-workflow-surface);
+  stroke: var(--ngx-workflow-primary);
+  stroke-width: 1.5;
+  width: 8px;
+  height: 8px;
+  transition: transform 0.2s ease;
+  
+  /* Ensure scaling happens from center to avoid moving the element away from mouse */
+  transform-box: fill-box;
+  transform-origin: center;
+
+  &:hover {
+    fill: var(--ngx-workflow-primary);
+    transform: scale(1.2);
+  }
+
+  &[data-handle='nw'] {
+    cursor: nw-resize;
+  }
+
+  &[data-handle='ne'] {
+    cursor: ne-resize;
+  }
+
+  &[data-handle='sw'] {
+    cursor: sw-resize;
+  }
+
+  &[data-handle='se'] {
+    cursor: se-resize;
+  }
+}

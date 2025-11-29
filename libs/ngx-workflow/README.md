@@ -32,12 +32,12 @@ import { Node, Edge } from 'ngx-workflow';
   selector: 'app-workflow',
   template: `
     <div style="width: 100%; height: 600px;">
-      <ngx-workflow-diagram
+      <ngx-diagram
         [initialNodes]="nodes"
         [initialEdges]="edges"
         (nodeClick)="onNodeClick($event)"
         (connect)="onConnect($event)"
-      ></ngx-workflow-diagram>
+      ></ngx-diagram>
     </div>
   `
 })
@@ -89,10 +89,10 @@ export class WorkflowComponent {
 Use `DiagramStateService` for programmatic control:
 
 ```typescript
-import { NgxWorkflowModule } from 'ngx-workflow';
+import { NgxFlowModule } from 'ngx-workflow';
 
 @NgModule({
-  imports: [NgxWorkflowModule],
+  imports: [NgxFlowModule],
 })
 export class AppModule {}
 ```
@@ -107,7 +107,7 @@ import { DiagramStateService } from 'ngx-workflow';
   selector: 'app-workflow',
   template: `
     <div style="width: 100%; height: 600px;">
-      <ngx-workflow-diagram></ngx-workflow-diagram>
+      <ngx-diagram></ngx-diagram>
     </div>
     <button (click)="addNode()">Add Node</button>
   `

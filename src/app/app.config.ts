@@ -5,13 +5,13 @@ import {
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import {
-  NgxFlowModule,
-  NGX_FLOW_NODE_TYPES,
+  NgxWorkflowModule,
+  NGX_WORKFLOW_NODE_TYPES,
   RoundedRectNodeComponent,
   DiagramStateService,
   LayoutService,
   UndoRedoService,
-} from 'ngx-flow';
+} from 'ngx-workflow';
 
 import { routes } from './app.routes';
 import { provideRouter } from '@angular/router';
@@ -21,12 +21,12 @@ export const appConfig: ApplicationConfig = {
     provideZonelessChangeDetection(),
     provideRouter(routes),
 
-    importProvidersFrom(CommonModule, NgxFlowModule), // Import NgxFlowModule
+    importProvidersFrom(CommonModule, NgxWorkflowModule), // Import NgxFlowModule
     DiagramStateService,
     LayoutService,
     UndoRedoService,
     {
-      provide: NGX_FLOW_NODE_TYPES,
+      provide: NGX_WORKFLOW_NODE_TYPES,
       useValue: {
         'rounded-rect': RoundedRectNodeComponent,
         // Add other custom node types here for the demo

@@ -1,6 +1,6 @@
-# Publishing ngx-flow to NPM
+# Publishing ngx-workflow to NPM
 
-This guide describes how to build and publish the `ngx-flow` library to NPM.
+This guide describes how to build and publish the `ngx-workflow` library to NPM.
 
 ## Prerequisites
 
@@ -11,11 +11,11 @@ This guide describes how to build and publish the `ngx-flow` library to NPM.
 
 ### 1. Update Version
 
-Update the version number in `libs/ngx-flow/package.json`. Follow [Semantic Versioning](https://semver.org/).
+Update the version number in `libs/ngx-workflow/package.json`. Follow [Semantic Versioning](https://semver.org/).
 
 ```json
 {
-  "name": "ngx-flow",
+  "name": "ngx-workflow",
   "version": "0.0.1", 
   ...
 }
@@ -26,21 +26,21 @@ Update the version number in `libs/ngx-flow/package.json`. Follow [Semantic Vers
 Run the build command to compile the library. This uses `ng-packagr` to create an optimized package format (APF).
 
 ```bash
-ng build ngx-flow
+ng build ngx-workflow
 ```
 
-The output will be generated in `dist/ngx-flow`.
+The output will be generated in `dist/ngx-workflow`.
 
 ### 3. Publish
 
 Navigate to the distribution directory and run `npm publish`.
 
 ```bash
-cd dist/ngx-flow
+cd dist/ngx-workflow
 npm publish
 ```
 
-**Note:** If this is the first time you are publishing a scoped package (e.g., `@your-org/ngx-flow`), you might need to add `--access public`:
+**Note:** If this is the first time you are publishing a scoped package (e.g., `@your-org/ngx-workflow`), you might need to add `--access public`:
 
 ```bash
 npm publish --access public
@@ -48,7 +48,7 @@ npm publish --access public
 
 ## Verification
 
-After publishing, you can verify your package on [npmjs.com](https://www.npmjs.com/package/ngx-flow).
+After publishing, you can verify your package on [npmjs.com](https://www.npmjs.com/package/ngx-workflow).
 
 ## Competitor Analysis (vs React Flow)
 

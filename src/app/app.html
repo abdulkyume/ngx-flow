@@ -1,27 +1,21 @@
 <div class="header">
-  <h1>NgxFlow Demo</h1>
+  <h1>NgxWorkflow Demo</h1>
   <div class="controls">
     <button (click)="addRandomNode()">Add Node</button>
     <button (click)="applyElkLayout()">ELK Layout</button>
-  <button (click)="exportJSON()">Export JSON</button>
-  <input type="file" accept="application/json" (change)="importJSON($event)" />
-  <button (click)="exportPNG()">Export PNG</button>
-  <button (click)="exportSVG()">Export SVG</button>
+    <button (click)="exportJSON()">Export JSON</button>
+    <input type="file" accept="application/json" (change)="importJSON($event)" />
+    <button (click)="exportPNG()">Export PNG</button>
+    <button (click)="exportSVG()">Export SVG</button>
     <button (click)="fitView()">Fit View</button>
-  <button (click)="clearFlow()">Clear All</button>
+    <button (click)="clearFlow()">Clear All</button>
   </div>
 </div>
 
 <div class="flow-container">
-  <ngx-diagram 
-    class="flow-diagram"
-    [initialNodes]="nodes"
-    [initialEdges]="edges"
-    [initialViewport]="viewport"
-    (nodeClick)="onNodeClick($event)"
-    (nodesChange)="onNodesChange($event)"
-    (edgesChange)="onEdgesChange($event)"
-  ></ngx-diagram>
+  <ngx-workflow-diagram class="flow-diagram" [initialNodes]="nodes" [initialEdges]="edges" [initialViewport]="viewport"
+    (nodeClick)="onNodeClick($event)" (nodesChange)="onNodesChange($event)"
+    (edgesChange)="onEdgesChange($event)"></ngx-workflow-diagram>
 </div>
 
 <div class="footer">

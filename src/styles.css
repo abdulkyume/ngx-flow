@@ -1,35 +1,35 @@
 /* You can add global styles to this file, and also import other style files */
 
 :root {
-  /* Default light theme variables for ngx-flow */
-  --ngx-flow-selection-color: #1a192b;
-  --ngx-flow-node-bg: #ffffff;
-  --ngx-flow-node-border: #1a192b;
-  --ngx-flow-node-text-color: #333333;
-  --ngx-flow-edge-color: #b1b1b7;
-  --ngx-flow-source-handle-color: #1a192b;
-  --ngx-flow-source-handle-border: #ffffff;
-  --ngx-flow-target-handle-color: #1a192b;
-  --ngx-flow-target-handle-border: #ffffff;
-  --ngx-flow-handle-valid-target-color: #00ff00;
-  --ngx-flow-handle-valid-target-border: #007f00;
-  --ngx-flow-background-color: #f8f8f8;
+  /* Default light theme variables for ngx-workflow */
+  --ngx-workflow-selection-color: #1a192b;
+  --ngx-workflow-node-bg: #ffffff;
+  --ngx-workflow-node-border: #1a192b;
+  --ngx-workflow-node-text-color: #333333;
+  --ngx-workflow-edge-color: #b1b1b7;
+  --ngx-workflow-source-handle-color: #1a192b;
+  --ngx-workflow-source-handle-border: #ffffff;
+  --ngx-workflow-target-handle-color: #1a192b;
+  --ngx-workflow-target-handle-border: #ffffff;
+  --ngx-workflow-handle-valid-target-color: #00ff00;
+  --ngx-workflow-handle-valid-target-border: #007f00;
+  --ngx-workflow-background-color: #f8f8f8;
 }
 
 /* Example of how you could apply a dark theme */
 /*
 body.dark-mode {
-  --ngx-flow-selection-color: #c9c9c9;
-  --ngx-flow-node-bg: #333333;
-  --ngx-flow-node-border: #eeeeee;
-  --ngx-flow-node-text-color: #ffffff;
-  --ngx-flow-edge-color: #777777;
-  --ngx-flow-source-handle-color: #c9c9c9;
-  --ngx-flow-source-handle-border: #333333;
-  --ngx-flow-target-handle-color: #c9c9c9;
-  --ngx-flow-target-handle-border: #333333;
-  --ngx-flow-handle-valid-target-color: #008000;
-  --ngx-flow-handle-valid-target-border: #004000;
-  --ngx-flow-background-color: #1a192b;
+  --ngx-workflow-selection-color: #c9c9c9;
+  --ngx-workflow-node-bg: #333333;
+  --ngx-workflow-node-border: #eeeeee;
+  --ngx-workflow-node-text-color: #ffffff;
+  --ngx-workflow-edge-color: #777777;
+  --ngx-workflow-source-handle-color: #c9c9c9;
+  --ngx-workflow-source-handle-border: #333333;
+  --ngx-workflow-target-handle-color: #c9c9c9;
+  --ngx-workflow-target-handle-border: #333333;
+  --ngx-workflow-handle-valid-target-color: #008000;
+  --ngx-workflow-handle-valid-target-border: #004000;
+  --ngx-workflow-background-color: #1a192b;
 }
 */
