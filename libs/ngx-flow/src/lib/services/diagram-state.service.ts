@@ -39,50 +39,86 @@ export class DiagramStateService {
   readonly alignmentGuides = signal<AlignmentGuide[]>([]);
   readonly searchQuery = signal<string>('');
   readonly filterType = signal<string | null>(null);
+  readonly containerDimensions = signal<{ width: number; height: number }>({ width: 0, height: 0 });
 
-  // Reference to the main SVG element, set by DiagramComponent
-  el!: ElementRef<SVGSVGElement>;
+  // Computed signals
+  readonly selectedNodes = computed(() => this.nodes().filter((n) => n.selected));
+  readonly selectedEdges = computed(() => this.edges().filter((e) => e.selected));
 
-  // Computed signals for derived state
-  readonly selectedNodes = computed(() => this.nodes().filter((node) => node.selected));
-  readonly selectedEdges = computed(() => this.edges().filter((edge) => edge.selected));
-
-  // Computed signal for view nodes (applying search/filter state)
   readonly viewNodes = computed(() => {
     const nodes = this.nodes();
     const query = this.searchQuery().toLowerCase();
     const type = this.filterType();
 
-    if (!query && !type) {
-      return nodes.map(n => ({ ...n, highlighted: false, dimmed: false }));
-    }
-
     return nodes.map(node => {
-      const matchesQuery = !query ||
-        (node.label?.toLowerCase().includes(query)) ||
-        (JSON.stringify(node.data).toLowerCase().includes(query));
+      const matchesSearch = !query ||
+        (node.label && node.label.toLowerCase().includes(query)) ||
+        (node.data && JSON.stringify(node.data).toLowerCase().includes(query));
 
       const matchesType = !type || node.type === type;
 
-      const isMatch = matchesQuery && matchesType;
+      const isMatch = matchesSearch && matchesType;
+
+      // If there is a search/filter active, highlight matches and dim non-matches
+      // If no search/filter, reset (no highlight, no dim)
+      const isActive = !!query || !!type;
 
       return {
         ...node,
-        highlighted: isMatch,
-        dimmed: !isMatch
+        highlighted: isActive && isMatch,
+        dimmed: isActive && !isMatch
       };
     });
   });
 
-  // Event Emitters
-  readonly nodeClick = new EventEmitter<Node>();
-  readonly edgeClick = new EventEmitter<Edge>();
-  readonly connect = new EventEmitter<Connection>();
-  readonly dragStart = new EventEmitter<Node>();
+  readonly visibleNodes = computed(() => {
+    const nodes = this.viewNodes();
+    const viewport = this.viewport();
+    const dimensions = this.containerDimensions();
+    const buffer = 500; // Buffer in pixels
+
+    if (dimensions.width === 0 || dimensions.height === 0) {
+      return nodes; // Render all if dimensions not set
+    }
+
+    const minX = -viewport.x / viewport.zoom - buffer;
+    const maxX = (-viewport.x + dimensions.width) / viewport.zoom + buffer;
+    const minY = -viewport.y / viewport.zoom - buffer;
+    const maxY = (-viewport.y + dimensions.height) / viewport.zoom + buffer;
+
+    return nodes.filter(node => {
+      const nodeX = node.position.x;
+      const nodeY = node.position.y;
+      const nodeWidth = node.width || 150; // Default width
+      const nodeHeight = node.height || 60; // Default height
+
+      return (
+        nodeX + nodeWidth >= minX &&
+        nodeX <= maxX &&
+        nodeY + nodeHeight >= minY &&
+        nodeY <= maxY
+      );
+    });
+  });
+
+  readonly lodLevel = computed(() => {
+    const zoom = this.viewport().zoom;
+    if (zoom < 0.4) return 'low';
+    if (zoom < 0.8) return 'medium';
+    return 'high';
+  });
+
+  // Reference to the main SVG element, set by DiagramComponent
+  el: ElementRef<HTMLElement | SVGSVGElement> | undefined;
+
   readonly dragEnd = new EventEmitter<Node>();
   readonly nodesChange = new EventEmitter<Node[]>();
   readonly edgesChange = new EventEmitter<Edge[]>();
   readonly viewportChange = new EventEmitter<Viewport>();
+  readonly nodeClick = new EventEmitter<Node>();
+  readonly edgeClick = new EventEmitter<Edge>();
+  readonly connect = new EventEmitter<Connection>();
+  readonly dragStart = new EventEmitter<Node>();
 
   // Internal subjects for batched updates
   private nodeUpdates$ = new Subject<Node[]>();
@@ -835,5 +871,9 @@ export class DiagramStateService {
 
   setZoom(zoom: number): void {
     this.viewport.update(v => ({ ...v, zoom }));
+  }
+
+  setContainerDimensions(dimensions: { width: number; height: number }): void {
+    this.containerDimensions.set(dimensions);
   }
 }

@@ -212,11 +212,13 @@ export class DiagramComponent implements OnInit, OnDestroy, OnChanges {
   }
 
   private nodes$: Observable<Node[]>;
+  private resizeObserver!: ResizeObserver;
+
   ngOnInit(): void {
     this.diagramStateService.el = this.svgRef;
     this.viewport = this.diagramStateService.viewport;
     this.nodes = this.diagramStateService.nodes;
-    this.filteredNodes = this.diagramStateService.viewNodes;
+    this.filteredNodes = this.diagramStateService.visibleNodes; // Use visibleNodes for rendering
     this.edges = this.diagramStateService.edges;
     this.tempEdges = this.diagramStateService.tempEdges;
     this.alignmentGuides = this.diagramStateService.alignmentGuides;
@@ -255,6 +257,18 @@ export class DiagramComponent implements OnInit, OnDestroy, OnChanges {
       this.diagramStateService.edgesChange.subscribe((edges: Edge[]) => this.edgesChange.emit(edges))
     );
 
+    // Initialize ResizeObserver
+    this.resizeObserver = new ResizeObserver(entries => {
+      for (const entry of entries) {
+        const { width, height } = entry.contentRect;
+        this.diagramStateService.setContainerDimensions({ width, height });
+      }
+    });
+
+    // We need to observe the container, but we only have el (host) or svgRef.
+    // Let's observe the host element.
+    this.resizeObserver.observe(this.el.nativeElement);
+
     this.ngZone.runOutsideAngular(() => {
       this.unlistenPointerMove = this.renderer.listen(this.svgRef.nativeElement, 'pointermove', (event: PointerEvent) => {
         this.onPointerMove(event);
@@ -266,6 +280,20 @@ export class DiagramComponent implements OnInit, OnDestroy, OnChanges {
         this.onPointerLeave(event);
       });
     });
+  }
+
+  ngOnDestroy(): void {
+    this.subscriptions.unsubscribe();
+    if (this.resizeObserver) {
+      this.resizeObserver.disconnect();
+    }
+    if (this.unlistenPointerMove) this.unlistenPointerMove();
+    if (this.unlistenPointerUp) this.unlistenPointerUp();
+    if (this.unlistenPointerLeave) this.unlistenPointerLeave();
+  }
+
+  get lodLevel(): string {
+    return this.diagramStateService.lodLevel();
   }
 
   ngOnChanges(changes: SimpleChanges): void {
@@ -311,12 +339,7 @@ export class DiagramComponent implements OnInit, OnDestroy, OnChanges {
     }
   }
 
-  ngOnDestroy(): void {
-    this.subscriptions.unsubscribe();
-    if (this.unlistenPointerMove) this.unlistenPointerMove();
-    if (this.unlistenPointerUp) this.unlistenPointerUp();
-    if (this.unlistenPointerLeave) this.unlistenPointerLeave();
-  }
+
 
   get transform(): string {
     const v = this.viewport();
