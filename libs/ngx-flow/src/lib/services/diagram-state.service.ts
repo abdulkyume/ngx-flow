@@ -642,7 +642,6 @@ export class DiagramStateService {
   }
 
   resizeNode(id: string, width: number, height: number, position?: XYPosition): void {
-    this.undoRedoService.saveState(this.getCurrentState());
     this.nodes.update((nodes) =>
       nodes.map((n) => {
         if (n.id === id) {
