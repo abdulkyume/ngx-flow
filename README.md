@@ -51,10 +51,12 @@ Bind directly to your data. The diagram updates when your data changes.
 
 ```typescript
 import { Component } from '@angular/core';
-import { Node, Edge, Viewport } from 'ngx-workflow';
+import { NgxWorkflowModule, Node, Edge } from 'ngx-workflow';
 
 @Component({
   selector: 'app-root',
+  standalone: true,
+  imports: [NgxWorkflowModule],
   template: `
     <div style="height: 100vh; width: 100%;">
       <ngx-workflow-diagram
