@@ -4,7 +4,7 @@ This document provides a comprehensive overview of the public API for the `ngx-w
 
 ---
 
-## `NgxFlowModule`
+## `NgxWorkflowModule`
 
 The main Angular module to import into your application. It provides all necessary components, services, and directives.
 
@@ -13,11 +13,11 @@ The main Angular module to import into your application. It provides all necessa
 ```typescript
 import { importProvidersFrom } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { NgxFlowModule } from 'ngx-workflow';
+import { NgxWorkflowModule } from 'ngx-workflow';
 
 export const appConfig: ApplicationConfig = {
   providers: [
-    importProvidersFrom(CommonModule, NgxFlowModule),
+    importProvidersFrom(CommonModule, NgxWorkflowModule),
     // ... other providers, including custom node/edge types
   ]
 };
@@ -27,11 +27,11 @@ export const appConfig: ApplicationConfig = {
 
 ## Components
 
-### `<ngx-diagram>`
+### `<ngx-workflow-diagram>`
 
 The main container for your flow chart. All nodes, edges, and interactions happen within this component.
 
-**Selector:** `ngx-diagram`
+**Selector:** `ngx-workflow-diagram`
 
 **Inputs:**
 None (currently, all data and state are managed via `DiagramStateService`).
@@ -41,11 +41,11 @@ None (all events are emitted via `DiagramStateService`).
 
 ---
 
-### `<ngx-node>`
+### `<ngx-workflow-node>`
 
 The wrapper component for rendering individual nodes. It handles positioning, dragging, selection, and embedding custom node types.
 
-**Selector:** `ngx-node`
+**Selector:** `ngx-workflow-node`
 
 **Inputs:**
 -   `node: Node` (required): The `Node` object to be rendered.
@@ -55,11 +55,11 @@ None (all node-related events are emitted via `DiagramStateService`).
 
 ---
 
-### `<ngx-edge>`
+### `<ngx-workflow-edge>`
 
 The wrapper component for rendering individual edges. It handles path calculation, interaction, and embedding custom edge types (though currently, custom edge *types* are handled via path generation functions).
 
-**Selector:** `ngx-edge`
+**Selector:** `ngx-workflow-edge`
 
 **Inputs:**
 -   `edge: Edge | TempEdge` (required): The `Edge` or `TempEdge` object to be rendered.
@@ -70,11 +70,11 @@ None (all edge-related events are emitted via `DiagramStateService`).
 
 ---
 
-### `<ngx-handle>`
+### `<ngx-workflow-handle>`
 
 Represents a connectable handle on a node, used for initiating and completing connections.
 
-**Selector:** `ngx-handle`
+**Selector:** `ngx-workflow-handle`
 
 **Inputs:**
 -   `type: 'source' | 'target'` (required): Specifies if the handle is for source or target connections.
@@ -91,7 +91,7 @@ None (connection events are handled internally and emitted via `DiagramStateServ
 
 A sample custom node component provided by the library.
 
-**Selector:** `ngx-rounded-rect-node`
+**Selector:** `ngx-workflow-rounded-rect-node`
 
 **Inputs:**
 -   `node: Node`: The `Node` object to display.
@@ -272,19 +272,19 @@ export interface DiagramState {
 
 ## Injection Tokens
 
-### `NGX_FLOW_NODE_TYPES`
+### `NGX_WORKFLOW_NODE_TYPES`
 
 An `InjectionToken` used to provide a map of custom node types (string keys to `NodeComponentType` values).
 
 ```typescript
-export const NGX_FLOW_NODE_TYPES = new InjectionToken<Record<string, NodeComponentType>>('NGX_FLOW_NODE_TYPES');
+export const NGX_WORKFLOW_NODE_TYPES = new InjectionToken<Record<string, NodeComponentType>>('NGX_WORKFLOW_NODE_TYPES');
 ```
 
-### `NGX_FLOW_EDGE_TYPES`
+### `NGX_WORKFLOW_EDGE_TYPES`
 
 An `InjectionToken` used to provide a map of custom edge types (string keys to `EdgeComponentType` values).
 (Currently not fully utilized for custom *components*, but available for future expansion if custom edge *components* are needed beyond path styles).
 
 ```typescript
-export const NGX_FLOW_EDGE_TYPES = new InjectionToken<Record<string, EdgeComponentType>>('NGX_FLOW_EDGE_TYPES');
+export const NGX_WORKFLOW_EDGE_TYPES = new InjectionToken<Record<string, EdgeComponentType>>('NGX_WORKFLOW_EDGE_TYPES');
 ```

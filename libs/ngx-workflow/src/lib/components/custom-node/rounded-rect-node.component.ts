@@ -3,7 +3,7 @@ import { CommonModule } from '@angular/common';
 import { Node } from '../../models/node.model';
 
 @Component({
-  selector: 'ngx-rounded-rect-node',
+  selector: 'ngx-workflow-rounded-rect-node',
   template: `
     <svg:g class="ngx-workflow__custom-node ngx-workflow__rounded-rect-node">
       <rect

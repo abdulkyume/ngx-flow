@@ -102,6 +102,18 @@
           class="ngx-workflow__handle-circle">
         </circle>
 
+        <!-- Top Handle -->
+        <g class="ngx-workflow__handle ngx-workflow__handle--source ngx-workflow__handle--target"
+          [attr.data-nodeid]="node.id" data-handleid="top" [attr.data-type]="'source'">
+          <!-- Hit area -->
+          <circle [attr.cx]="(node.width || defaultNodeWidth) / 2" cy="-10" r="20" fill="transparent"
+            pointer-events="all"></circle>
+          <!-- Visual -->
+          <circle [attr.cx]="(node.width || defaultNodeWidth) / 2" [attr.cy]="0" r="6"
+            class="ngx-workflow__handle-circle">
+          </circle>
+        </g>
+
         <!-- Right Handle -->
         <g class="ngx-workflow__handle ngx-workflow__handle--source ngx-workflow__handle--target"
           [attr.data-nodeid]="node.id" data-handleid="right" [attr.data-type]="'source'">
