@@ -3,7 +3,7 @@
   "version": 1,
   "newProjectRoot": "projects",
   "projects": {
-    "ngx-workflow": {
+    "ngx-workflow-demo": {
       "projectType": "application",
       "schematics": {},
       "root": "",
@@ -54,10 +54,10 @@
           "builder": "@angular/build:dev-server",
           "configurations": {
             "production": {
-              "buildTarget": "ngx-workflow:build:production"
+              "buildTarget": "ngx-workflow-demo:build:production"
             },
             "development": {
-              "buildTarget": "ngx-workflow:build:development"
+              "buildTarget": "ngx-workflow-demo:build:development"
             }
           },
           "defaultConfiguration": "development"
@@ -68,7 +68,9 @@
         "test": {
           "builder": "@angular/build:karma",
           "options": {
-            "polyfills":[ "src/polyfills.ts"],
+            "polyfills": [
+              "src/polyfills.ts"
+            ],
             "tsConfig": "tsconfig.spec.json",
             "assets": [
               {
@@ -78,6 +80,39 @@
             ],
             "styles": [
               "src/styles.css"
+            ]
+          }
+        }
+      }
+    },
+    "ngx-workflow": {
+      "projectType": "library",
+      "root": "libs/ngx-workflow",
+      "sourceRoot": "libs/ngx-workflow/src",
+      "prefix": "lib",
+      "architect": {
+        "build": {
+          "builder": "@angular-devkit/build-angular:ng-packagr",
+          "options": {
+            "project": "libs/ngx-workflow/ng-package.json"
+          },
+          "configurations": {
+            "production": {
+              "tsConfig": "libs/ngx-workflow/tsconfig.lib.json"
+            },
+            "development": {
+              "tsConfig": "libs/ngx-workflow/tsconfig.lib.json"
+            }
+          },
+          "defaultConfiguration": "production"
+        },
+        "test": {
+          "builder": "@angular-devkit/build-angular:karma",
+          "options": {
+            "tsConfig": "libs/ngx-workflow/tsconfig.spec.json",
+            "polyfills": [
+              "zone.js",
+              "zone.js/testing"
             ]
           }
         }
