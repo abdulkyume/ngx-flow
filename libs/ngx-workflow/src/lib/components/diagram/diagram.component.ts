@@ -6,7 +6,7 @@ import { Viewport, XYPosition, Node as WorkflowNode, Edge, TempEdge, DiagramStat
 import { Subscription, Observable } from 'rxjs';
 import { NGX_WORKFLOW_NODE_TYPES } from '../../injection-tokens';
 import { NodeComponentType as WorkflowNodeComponentType } from '../../types';
-import { getBezierPath, getStraightPath, getStepPath, getSelfLoopPath, getSmartEdgePath, PathFinder, getPolylineMidpoint } from '../../utils';
+import { getBezierPath, getStraightPath, getStepPath, getSmoothStepPath, getSelfLoopPath, getSmartEdgePath, PathFinder, getPolylineMidpoint } from '../../utils';
 import { v4 as uuidv4 } from 'uuid';
 import { ZoomControlsComponent } from '../zoom-controls/zoom-controls.component';
 import { MinimapComponent } from '../minimap/minimap.component';
@@ -1334,6 +1334,7 @@ export class DiagramComponent implements OnInit, OnDestroy, OnChanges {
     switch (edge.type) {
       case 'bezier': return getBezierPath(sourcePos, targetPos);
       case 'step': return getStepPath(sourcePos, targetPos);
+      case 'smoothstep': return getSmoothStepPath(sourcePos, targetPos);
       case 'straight': return getStraightPath(sourcePos, targetPos);
       default: return getStraightPath(sourcePos, targetPos);
     }

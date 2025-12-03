@@ -14,6 +14,39 @@ export function getStepPath(source: XYPosition, target: XYPosition): string {
   return `M ${source.x},${source.y} L ${source.x},${midY} L ${target.x},${midY} L ${target.x},${target.y}`;
 }
 
+export function getSmoothStepPath(source: XYPosition, target: XYPosition, borderRadius: number = 5): string {
+  const midY = (source.y + target.y) / 2;
+  const { x: sx, y: sy } = source;
+  const { x: tx, y: ty } = target;
+
+  // If points are too close, fallback to straight line or simple step
+  if (Math.abs(sx - tx) < 2 * borderRadius || Math.abs(sy - ty) < 2 * borderRadius) {
+    return getStepPath(source, target);
+  }
+
+  // Direction signs
+  const dirX = tx > sx ? 1 : -1;
+  const dirY = ty > sy ? 1 : -1;
+
+  // We assume Top-Bottom flow for simplicity in this helper, similar to getStepPath
+  // Corner 1: (sx, midY)
+  // Corner 2: (tx, midY)
+
+  const corner1X = sx;
+  const corner1Y = midY;
+  const corner2X = tx;
+  const corner2Y = midY;
+
+  return `
+    M ${sx},${sy}
+    L ${corner1X},${corner1Y - borderRadius * dirY}
+    Q ${corner1X},${corner1Y} ${corner1X + borderRadius * dirX},${corner1Y}
+    L ${corner2X - borderRadius * dirX},${corner2Y}
+    Q ${corner2X},${corner2Y} ${corner2X},${corner2Y + borderRadius * dirY}
+    L ${tx},${ty}
+  `.replace(/\s+/g, ' ').trim();
+}
+
 export function getSelfLoopPath(source: XYPosition, handle: string = 'top', offset: number = 30): string {
   const { x, y } = source;
 

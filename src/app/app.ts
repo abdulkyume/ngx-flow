@@ -53,7 +53,7 @@ export class App implements OnInit {
         sourceHandle: 'bottom',
         target: '3',
         targetHandle: 'top',
-        // type: 'step', // Removed to test default smart routing
+        type: 'smoothstep',
         label: 'alternate path',
         markerEnd: 'arrow'
       },
