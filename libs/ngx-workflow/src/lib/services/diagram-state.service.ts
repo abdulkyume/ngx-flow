@@ -69,6 +69,11 @@ export class DiagramStateService {
         highlighted: isActive && isMatch,
         dimmed: isActive && !isMatch
       };
+    }).sort((a, b) => {
+      // Render groups first so they are behind other nodes
+      if (a.type === 'group' && b.type !== 'group') return -1;
+      if (a.type !== 'group' && b.type === 'group') return 1;
+      return 0;
     });
   });
 

@@ -949,6 +949,7 @@ export class DiagramComponent implements OnInit, OnDestroy, OnChanges {
     // Trigger onDragEnd for all dragged nodes
     this.draggingNodes.forEach(node => {
       this.diagramStateService.onDragEnd(node);
+      this.checkReparenting(node);
     });
     console.log('stopDraggingNode: stopped');
 
@@ -958,6 +959,50 @@ export class DiagramComponent implements OnInit, OnDestroy, OnChanges {
 
     // Emit the final state after drag is complete
     this.nodesChange.emit(this.nodes());
+  }
+
+  private checkReparenting(node: WorkflowNode): void {
+    // Find if the node is dropped onto a group
+    const nodes = this.nodes();
+    const nodeRect = {
+      x: node.position.x,
+      y: node.position.y,
+      width: node.width || this.defaultNodeWidth,
+      height: node.height || this.defaultNodeHeight
+    };
+
+    const nodeCenter = {
+      x: nodeRect.x + nodeRect.width / 2,
+      y: nodeRect.y + nodeRect.height / 2
+    };
+
+    const potentialParents = nodes.filter(n =>
+      n.type === 'group' &&
+      n.id !== node.id &&
+      // Check if center is inside group
+      nodeCenter.x >= n.position.x &&
+      nodeCenter.x <= n.position.x + (n.width || this.defaultNodeWidth) &&
+      nodeCenter.y >= n.position.y &&
+      nodeCenter.y <= n.position.y + (n.height || this.defaultNodeHeight)
+    );
+
+    let newParentId: string | undefined = undefined;
+
+    if (potentialParents.length > 0) {
+      // Sort by area (smallest first) to find the most specific group
+      potentialParents.sort((a, b) => {
+        const areaA = (a.width || this.defaultNodeWidth) * (a.height || this.defaultNodeHeight);
+        const areaB = (b.width || this.defaultNodeWidth) * (b.height || this.defaultNodeHeight);
+        return areaA - areaB;
+      });
+      newParentId = potentialParents[0].id;
+    }
+
+    // Only update if parent changed
+    if (node.parentId !== newParentId) {
+      console.log(`Reparenting node ${node.id} to ${newParentId || 'root'}`);
+      this.diagramStateService.updateNode(node.id, { parentId: newParentId });
+    }
   }
 
   // --- Resizing Logic ---
