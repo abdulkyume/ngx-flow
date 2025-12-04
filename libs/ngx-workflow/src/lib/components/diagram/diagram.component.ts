@@ -96,6 +96,17 @@ export class DiagramComponent implements OnInit, OnDestroy, OnChanges {
   @Output() nodeDoubleClick = new EventEmitter<WorkflowNode>();
   @Output() contextMenu = new EventEmitter<{ type: 'node' | 'edge' | 'canvas'; item?: WorkflowNode | Edge; event: MouseEvent }>();
 
+  // Connection validation callback
+  @Input() validateConnection?: (connection: {
+    source: string;
+    sourceHandle?: string;
+    target?: string;
+    targetHandle?: string;
+  }) => boolean;
+
+  // Custom edge template
+  @Input() edgeTemplate?: TemplateRef<any>;
+
   // Sidebar State
   selectedNodeForEditing: WorkflowNode | null = null;
 
@@ -1769,9 +1780,212 @@ export class DiagramComponent implements OnInit, OnDestroy, OnChanges {
 
   private endSelecting(event: PointerEvent): void {
     if (!this.isSelecting) return;
+    ctx.drawImage(img, 0, 0);
 
-    this.isSelecting = false;
-    this.svgRef.nativeElement.releasePointerCapture(event.pointerId);
-    this.diagramStateService.endBoxSelection();
+    const pngUrl = canvas.toDataURL('image/png');
+
+    if (download) {
+      this.downloadFile(pngUrl, fileName);
+    }
+
+    URL.revokeObjectURL(url);
+    resolve(pngUrl);
+  };
+
+      img.onerror = (e) => {
+    URL.revokeObjectURL(url);
+    reject(e);
+  };
+
+      img.src = url;
+});
   }
+
+/**
+ * Exports the diagram state as a JSON file.
+ * @param fileName The name of the file to download (default: 'diagram.json')
+ */
+exportToJSON(fileName: string = 'diagram.json'): void {
+  const state = this.getDiagramState();
+  const jsonString = JSON.stringify(state, null, 2);
+  const blob = new Blob([jsonString], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  this.downloadFile(url, fileName);
+  URL.revokeObjectURL(url);
+}
+
+/**
+ * Triggers the file input to select a JSON file for import.
+ */
+triggerImport(): void {
+  const fileInput = document.createElement('input');
+  fileInput.type = 'file';
+  fileInput.accept = '.json';
+  fileInput.style.display = 'none';
+  fileInput.onchange = (e) => this.onFileSelected(e);
+  document.body.appendChild(fileInput);
+  fileInput.click();
+  document.body.removeChild(fileInput);
+}
+
+/**
+ * Handles the file selection for import.
+ */
+onFileSelected(event: Event): void {
+  const input = event.target as HTMLInputElement;
+  if(!input.files || input.files.length === 0) return;
+
+  const file = input.files[0];
+  const reader = new FileReader();
+
+  reader.onload = (e) => {
+    try {
+      const jsonString = e.target?.result as string;
+      const state = JSON.parse(jsonString) as DiagramState;
+
+      // Basic validation
+      if (state.nodes && state.edges && state.viewport) {
+        this.setDiagramState(state);
+      } else {
+        console.error('Invalid diagram JSON format');
+        // TODO: Show user notification
+      }
+    } catch (error) {
+      console.error('Error parsing JSON', error);
+      // TODO: Show user notification
+    }
+  };
+
+  reader.readAsText(file);
+}
+
+  private downloadFile(url: string, fileName: string): void {
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = fileName;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  document.body.removeChild(link);
+}
+
+onSearch(event: Event): void {
+  const input = event.target as HTMLInputElement;
+  this.diagramStateService.setSearchQuery(input.value);
+}
+
+onFilterType(event: Event): void {
+  const select = event.target as HTMLSelectElement;
+  this.diagramStateService.setFilterType(select.value || null);
+}
+
+onZoomChange(zoom: number): void {
+  this.diagramStateService.setZoom(zoom);
+}
+
+onMinimapViewportChange(viewport: Viewport): void {
+  this.diagramStateService.setViewport(viewport);
+}
+
+getEdgeHandlePosition(edge: Edge, type: 'source' | 'target'): XYPosition {
+  const nodes = this.nodes();
+  const nodeId = type === 'source' ? edge.source : edge.target;
+  const handleId = type === 'source' ? edge.sourceHandle : edge.targetHandle;
+  const node = nodes.find(n => n.id === nodeId);
+
+  if (!node) return { x: 0, y: 0 };
+
+  const pos = getHandleAbsolutePosition(node, handleId);
+
+  return {
+    x: isFinite(pos.x) ? pos.x : 0,
+    y: isFinite(pos.y) ? pos.y : 0
+  };
+}
+
+@HostListener('window:keydown', ['$event'])
+onKeyDown(event: KeyboardEvent): void {
+  const target = event.target as HTMLElement;
+  // Ignore if focus is on an input or textarea
+  if(target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) {
+  return;
+}
+
+// Delete or Backspace to remove selected elements
+if (event.key === 'Delete' || event.key === 'Backspace') {
+  this.diagramStateService.deleteSelectedElements();
+}
+
+// Ctrl+A or Cmd+A to select all
+if ((event.ctrlKey || event.metaKey) && event.key === 'a') {
+  event.preventDefault(); // Prevent default browser select all
+  this.diagramStateService.selectAll();
+}
+
+// Undo (Ctrl+Z) and Redo (Ctrl+Y or Ctrl+Shift+Z)
+if (event.ctrlKey || event.metaKey) {
+  if (event.key === 'z') {
+    event.preventDefault();
+    this.diagramStateService.undo();
+  } else if (event.key === 'y' || (event.shiftKey && event.key === 'Z')) {
+    event.preventDefault();
+    this.diagramStateService.redo();
+  }
+
+  // Clipboard Operations
+  if (event.key === 'c') {
+    // Handled by onCopyKeyPress
+  } else if (event.key === 'v') {
+    // Handled by onPasteKeyPress
+  } else if (event.key === 'x') {
+    // Handled by onCutKeyPress
+  }
+}
+
+// Escape to clear selection
+if (event.key === 'Escape') {
+  this.diagramStateService.clearSelection();
+  if (this.isSelecting) {
+    this.diagramStateService.cancelBoxSelection();
+    this.isSelecting = false;
+  }
+}
+  }
+
+  // --- Box Selection Methods ---
+
+  private startSelecting(event: PointerEvent): void {
+  const rect = this.svgRef.nativeElement.getBoundingClientRect();
+  const viewport = this.viewport();
+
+  const x = (event.clientX - rect.left - viewport.x) / viewport.zoom;
+  const y = (event.clientY - rect.top - viewport.y) / viewport.zoom;
+
+  this.isSelecting = true;
+  this.selectionStart = { x, y };
+  this.selectionEnd = { x, y };
+  this.diagramStateService.startBoxSelection(x, y);
+  this.svgRef.nativeElement.setPointerCapture(event.pointerId);
+}
+
+  private updateSelection(event: PointerEvent): void {
+  if(!this.isSelecting) return;
+
+  const rect = this.svgRef.nativeElement.getBoundingClientRect();
+  const viewport = this.viewport();
+
+  const x = (event.clientX - rect.left - viewport.x) / viewport.zoom;
+  const y = (event.clientY - rect.top - viewport.y) / viewport.zoom;
+
+  this.selectionEnd = { x, y };
+  this.diagramStateService.updateBoxSelection(x, y);
+}
+
+  private endSelecting(event: PointerEvent): void {
+  if(!this.isSelecting) return;
+
+  this.isSelecting = false;
+  this.svgRef.nativeElement.releasePointerCapture(event.pointerId);
+  this.diagramStateService.endBoxSelection();
+}
 }

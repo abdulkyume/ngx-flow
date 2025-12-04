@@ -243,6 +243,42 @@ foreignObject {
     r: 8;
     stroke-width: 2;
   }
+  
+  &.ngx-workflow__handle--invalid-target .ngx-workflow__handle-circle {
+    fill: #ef4444 !important; /* Red 500 */
+    stroke: #dc2626 !important;
+    r: 7;
+    stroke-width: 2;
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+}
+
+/* --- Box Selection Rectangle --- */
+.ngx-workflow__selection-box {
+  pointer-events: none;
+  animation: selectionPulse 1.5s ease-in-out infinite;
+}
+
+@keyframes selectionPulse {
+  0%, 100% { opacity: 0.8; }
+  50% { opacity: 1; }
+}
+
+/* --- Invalid Connection Feedback --- */
+@keyframes invalidConnectionShake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-4px); }
+  75% { transform: translateX(4px); }
+}
+
+.invalid-connection {
+  animation: invalidConnectionShake 0.3s ease-in-out 2;
+  
+  .ngx-workflow__node-rect {
+    stroke: #ef4444 !important; /* Red 500 */
+    stroke-width: 3px;
+  }
 }
 
 /* --- Controls (Glassmorphism) --- */
