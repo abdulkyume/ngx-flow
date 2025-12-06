@@ -119,6 +119,9 @@ export class DiagramComponent implements OnInit, OnDestroy, OnChanges {
   // Custom edge template
   @Input() edgeTemplate?: TemplateRef<any>;
 
+  // Edge reconnection feature
+  @Input() edgeReconnectable: boolean = false;
+
   // Sidebar State
   selectedNodeForEditing: WorkflowNode | null = null;
 
@@ -350,11 +353,9 @@ export class DiagramComponent implements OnInit, OnDestroy, OnChanges {
 
   // Helper to check if a connection is allowed
   private isValidConnection(sourceId: string, targetId: string): boolean {
-    // console.log('isValidConnection checking:', sourceId, targetId);
     // Prevent duplicate edges between same source and target
     const existing = this.edges().some(e => e.source === sourceId && e.target === targetId);
     if (existing) {
-      // console.log('isValidConnection: existing edge found');
       return false;
     }
     // Use custom validator if provided
@@ -1161,6 +1162,11 @@ export class DiagramComponent implements OnInit, OnDestroy, OnChanges {
     this.updatingEdgeHandle = handleType;
     this.svgRef.nativeElement.setPointerCapture(event.pointerId);
 
+    // Hide the original edge during reconnection
+    this.diagramStateService.edges.update(edges =>
+      edges.map(e => e.id === edge.id ? { ...e, hidden: true } : e)
+    );
+
     const tempEdgeId = `temp-update-${edge.id}`;
     this.currentPreviewEdgeId = tempEdgeId;
 
@@ -1237,13 +1243,57 @@ export class DiagramComponent implements OnInit, OnDestroy, OnChanges {
   private stopUpdatingEdge(event: PointerEvent): void {
     if (!this.updatingEdge) return;
     event.stopPropagation();
+
+    const edgeToUpdate = this.updatingEdge;
+    const handleType = this.updatingEdgeHandle;
+
     this.isUpdatingEdge = false;
     this.svgRef.nativeElement.releasePointerCapture(event.pointerId);
 
+    // Remove preview edge
     if (this.currentPreviewEdgeId) {
       this.diagramStateService.removeEdge(this.currentPreviewEdgeId);
       this.currentPreviewEdgeId = null;
     }
+
+    // If dropped on a valid handle, reconnect the edge
+    if (this.currentTargetHandle && handleType) {
+      const newEdge = { ...edgeToUpdate, hidden: false };
+
+      if (handleType === 'source') {
+        // Reconnecting source end
+        newEdge.source = this.currentTargetHandle.nodeId;
+        newEdge.sourceHandle = this.currentTargetHandle.handleId;
+      } else {
+        // Reconnecting target end
+        newEdge.target = this.currentTargetHandle.nodeId;
+        newEdge.targetHandle = this.currentTargetHandle.handleId;
+      }
+
+      // Validate the new connection
+      if (this.isValidConnection(newEdge.source, newEdge.target)) {
+        // Update the edge in the state using edges.update
+        this.diagramStateService.edges.update(edges =>
+          edges.map(e => e.id === edgeToUpdate.id ? newEdge : e)
+        );
+        this.edgesChange.emit(this.diagramStateService.edges());
+      } else {
+        // Show the original edge again if connection failed
+        this.diagramStateService.edges.update(edges =>
+          edges.map(e => e.id === edgeToUpdate.id ? { ...e, hidden: false } : e)
+        );
+      }
+    } else {
+      // Show the original edge again if no valid drop target
+      this.diagramStateService.edges.update(edges =>
+        edges.map(e => e.id === edgeToUpdate.id ? { ...e, hidden: false } : e)
+      );
+    }
+
+    // Clear state
+    this.updatingEdge = null;
+    this.updatingEdgeHandle = null;
+    this.currentTargetHandle = null;
   }
 
 
@@ -1730,24 +1780,48 @@ export class DiagramComponent implements OnInit, OnDestroy, OnChanges {
     this.diagramStateService.setZoom(zoom);
   }
 
-  onMinimapViewportChange(viewport: Viewport): void {
-    this.diagramStateService.setViewport(viewport);
-  }
-
   getEdgeHandlePosition(edge: Edge, type: 'source' | 'target'): XYPosition {
     const nodes = this.nodes();
-    const nodeId = type === 'source' ? edge.source : edge.target;
-    const handleId = type === 'source' ? edge.sourceHandle : edge.targetHandle;
-    const node = nodes.find(n => n.id === nodeId);
+    const sourceNode = nodes.find(n => n.id === edge.source);
+    const targetNode = nodes.find(n => n.id === edge.target);
 
-    if (!node) return { x: 0, y: 0 };
+    if (!sourceNode || !targetNode) {
+      return { x: 0, y: 0 };
+    }
 
-    const pos = getHandleAbsolutePosition(node, handleId);
+    const sourcePos = getHandleAbsolutePosition(sourceNode, edge.sourceHandle);
+    const targetPos = getHandleAbsolutePosition(targetNode, edge.targetHandle);
 
-    return {
-      x: isFinite(pos.x) ? pos.x : 0,
-      y: isFinite(pos.y) ? pos.y : 0
-    };
+    // Offset 30px along the edge from each node
+    const offset = 30;
+
+    if (type === 'source') {
+      const dx = targetPos.x - sourcePos.x;
+      const dy = targetPos.y - sourcePos.y;
+      const length = Math.sqrt(dx * dx + dy * dy);
+
+      if (length < offset * 2) return sourcePos;
+
+      return {
+        x: sourcePos.x + (dx / length) * offset,
+        y: sourcePos.y + (dy / length) * offset
+      };
+    } else {
+      const dx = sourcePos.x - targetPos.x;
+      const dy = sourcePos.y - targetPos.y;
+      const length = Math.sqrt(dx * dx + dy * dy);
+
+      if (length < offset * 2) return targetPos;
+
+      return {
+        x: targetPos.x + (dx / length) * offset,
+        y: targetPos.y + (dy / length) * offset
+      };
+    }
+  }
+
+  onMinimapViewportChange(viewport: Viewport): void {
+    this.diagramStateService.setViewport(viewport);
   }
 
   @HostListener('window:keydown', ['$event'])

@@ -200,6 +200,11 @@ foreignObject {
     stroke-dasharray: 10;
     animation: flowAnimation 1s linear infinite;
   }
+
+  &.hidden {
+    opacity: 0;
+    pointer-events: none;
+  }
 }
 
 @keyframes flowAnimation {

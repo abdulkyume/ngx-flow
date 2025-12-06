@@ -24,6 +24,9 @@ export interface Edge<T = any> {
   markerStart?: MarkerType | string;
   markerEnd?: MarkerType | string;
 
+  // Hidden state (for edge reconnection)
+  hidden?: boolean;
+
   // Custom data
   data?: T;
 }
