@@ -21,6 +21,7 @@ import { SearchControlsComponent } from '../search-controls/search-controls.comp
 import { NodeToolbarComponent } from '../node-toolbar/node-toolbar.component';
 import { PanelComponent } from '../panel/panel.component';
 import { ThemeService, ColorMode } from '../../services/theme.service';
+import { ExportService } from '../../services/export.service';
 
 // Helper function to get a node from the array
 function getNode(id: string, nodes: WorkflowNode[]): WorkflowNode | undefined {
@@ -413,6 +414,7 @@ export class DiagramComponent implements OnInit, OnDestroy, OnChanges {
     public diagramStateService: DiagramStateService,
     private contextMenuService: ContextMenuService,
     private themeService: ThemeService,
+    private exportService: ExportService,
     @Optional() @Inject(NGX_WORKFLOW_NODE_TYPES) public nodeTypes: Record<string, WorkflowNodeComponentType> | null
   ) {
     this.nodes$ = toObservable(this.diagramStateService.nodes);
@@ -1644,7 +1646,6 @@ export class DiagramComponent implements OnInit, OnDestroy, OnChanges {
     const clone = svgElement.cloneNode(true) as SVGSVGElement;
 
     // Get the bounding box of the content (nodes and edges)
-    // We need to calculate this manually because getBBox() on the clone won't work if it's not in the DOM
     const nodes = this.nodes();
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
 
@@ -1659,8 +1660,8 @@ export class DiagramComponent implements OnInit, OnDestroy, OnChanges {
       minX = 0; minY = 0; maxX = 100; maxY = 100;
     }
 
-    // Add some padding
-    const padding = 20;
+    // Add padding
+    const padding = 40;
     minX -= padding;
     minY -= padding;
     maxX += padding;
@@ -1674,8 +1675,20 @@ export class DiagramComponent implements OnInit, OnDestroy, OnChanges {
     clone.setAttribute('width', `${width}`);
     clone.setAttribute('height', `${height}`);
 
-    // Remove the transform from the viewport group in the clone to reset zoom/pan
-    // The viewport group is the first child g element
+    // Remove background and other non-content elements from clone
+    const background = clone.querySelector('ngx-workflow-background');
+    if (background) background.remove();
+
+    const gridOverlay = clone.querySelector('ngx-workflow-grid-overlay');
+    if (gridOverlay) gridOverlay.remove();
+
+    const minimap = clone.querySelector('ngx-workflow-minimap');
+    if (minimap) minimap.remove();
+
+    const controls = clone.querySelectorAll('.ngx-workflow__controls, .ngx-workflow__zoom-controls, .ngx-workflow__undo-redo-controls');
+    controls.forEach(el => el.remove());
+
+    // Reset the viewport transform
     const viewportGroup = clone.querySelector('.ngx-workflow__viewport');
     if (viewportGroup) {
       viewportGroup.removeAttribute('transform');
@@ -1686,7 +1699,7 @@ export class DiagramComponent implements OnInit, OnDestroy, OnChanges {
     let svgString = serializer.serializeToString(clone);
 
     // Add XML declaration
-    if (!svgString.match(/^<xml/)) {
+    if (!svgString.match(/^<\?xml/)) {
       svgString = '<?xml version="1.0" encoding="utf-8"?>\n' + svgString;
     }
 
@@ -1814,7 +1827,6 @@ export class DiagramComponent implements OnInit, OnDestroy, OnChanges {
     link.download = fileName;
     document.body.appendChild(link);
     link.click();
-    document.body.removeChild(link);
     document.body.removeChild(link);
   }
 

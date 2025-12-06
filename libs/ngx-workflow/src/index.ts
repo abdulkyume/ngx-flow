@@ -7,6 +7,7 @@ export * from './lib/components/context-menu/context-menu.component';
 export * from './lib/services/diagram-state.service';
 export * from './lib/services/layout.service';
 export * from './lib/services/undo-redo.service';
+export * from './lib/services/export.service';
 export * from './lib/services/context-menu.service';
 export * from './lib/models';
 export * from './lib/types';
