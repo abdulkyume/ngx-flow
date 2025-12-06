@@ -209,6 +209,36 @@ export class DiagramComponent implements OnInit, OnDestroy, OnChanges {
 
 
 
+  // --- Node Interaction Handlers ---
+
+  onNodePointerDown(event: PointerEvent, node: WorkflowNode): void {
+    // Ignore if clicking on a handle or resize handle
+    const target = event.target as HTMLElement;
+    if (target.classList.contains('ngx-workflow__handle') ||
+      target.classList.contains('ngx-workflow__resize-handle')) {
+      return;
+    }
+
+    event.stopPropagation();
+
+    // Select the node (toggle if ctrl/cmd is pressed)
+    const isMultiSelect = event.ctrlKey || event.metaKey;
+    if (!isMultiSelect) {
+      // Clear other selections
+      this.diagramStateService.nodes.update(nodes =>
+        nodes.map(n => ({ ...n, selected: n.id === node.id }))
+      );
+    } else {
+      // Toggle this node's selection
+      this.diagramStateService.nodes.update(nodes =>
+        nodes.map(n => n.id === node.id ? { ...n, selected: !n.selected } : n)
+      );
+    }
+
+    // Start dragging
+    this.diagramStateService.onDragStart(node);
+  }
+
   onNodeDoubleClick(event: MouseEvent, node: WorkflowNode): void {
     console.log('Node double clicked:', node);
     event.stopPropagation();
