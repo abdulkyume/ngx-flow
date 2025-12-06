@@ -93,6 +93,12 @@ export class DiagramComponent implements OnInit, OnDestroy, OnChanges {
   // Color mode (theme) configuration
   @Input() colorMode: ColorMode = 'light';
 
+  // Auto-panning configuration
+  @Input() autoPanOnNodeDrag: boolean = true;
+  @Input() autoPanOnConnect: boolean = true;
+  @Input() autoPanSpeed: number = 15; // pixels per frame
+  @Input() autoPanEdgeThreshold: number = 50; // pixels from edge
+
   // Output events
   @Output() nodeClick = new EventEmitter<WorkflowNode>();
   @Output() edgeClick = new EventEmitter<Edge>();
@@ -175,6 +181,10 @@ export class DiagramComponent implements OnInit, OnDestroy, OnChanges {
   private isUpdatingEdge = false;
   private updatingEdge: Edge | null = null;
   private updatingEdgeHandle: 'source' | 'target' | null = null;
+
+  // Auto-panning state
+  private autoPanInterval: number | null = null;
+  private autoPanDirection = { x: 0, y: 0 };
 
 
 
@@ -742,6 +752,14 @@ export class DiagramComponent implements OnInit, OnDestroy, OnChanges {
 
   // --- Connecting Logic ---
 
+  /**
+   * Public method called from template when handle is clicked
+   */
+  onHandlePointerDown(event: PointerEvent, node: WorkflowNode, handleId: string): void {
+    const handleElement = (event.currentTarget as HTMLElement);
+    this.startConnecting(event, handleElement);
+  }
+
   private startConnecting(event: PointerEvent, handleElement: HTMLElement): void {
     event.stopPropagation();
     event.preventDefault();
@@ -962,11 +980,18 @@ export class DiagramComponent implements OnInit, OnDestroy, OnChanges {
       this.cdRef.detectChanges();
       this.dragAnimationFrameId = null;
     });
+
+    // Check for auto-pan
+    this.checkAutoPan(event.clientX, event.clientY);
   }
 
   private stopDraggingNode(event: PointerEvent): void {
     if (!this.draggingNode) return;
     event.stopPropagation();
+
+    // Stop auto-pan
+    this.stopAutoPan();
+
     this.isDraggingNode = false;
     this.updatePathFinder(this.nodes());
     if (this.dragAnimationFrameId) {
@@ -1799,5 +1824,92 @@ export class DiagramComponent implements OnInit, OnDestroy, OnChanges {
     this.isSelecting = false;
     this.svgRef.nativeElement.releasePointerCapture(event.pointerId);
     this.diagramStateService.endBoxSelection();
+  }
+
+  /**
+   * Check if mouse is near viewport edge and calculate pan direction
+   */
+  private checkAutoPan(clientX: number, clientY: number): void {
+    if (!this.autoPanOnNodeDrag && !this.isDraggingNode) return;
+    if (!this.autoPanOnConnect && !this.isConnecting) return;
+
+    const container = this.svgRef.nativeElement.parentElement;
+    if (!container) return;
+
+    const rect = container.getBoundingClientRect();
+    const threshold = this.autoPanEdgeThreshold;
+
+    // Calculate distance from edges
+    const distanceFromLeft = clientX - rect.left;
+    const distanceFromRight = rect.right - clientX;
+    const distanceFromTop = clientY - rect.top;
+    const distanceFromBottom = rect.bottom - clientY;
+
+    // Determine pan direction
+    let panX = 0;
+    let panY = 0;
+
+    if (distanceFromLeft < threshold) {
+      panX = 1;
+    } else if (distanceFromRight < threshold) {
+      panX = -1;
+    }
+
+    if (distanceFromTop < threshold) {
+      panY = 1;
+    } else if (distanceFromBottom < threshold) {
+      panY = -1;
+    }
+
+    // Start or stop auto-pan
+    if (panX !== 0 || panY !== 0) {
+      this.startAutoPan(panX, panY);
+    } else {
+      this.stopAutoPan();
+    }
+  }
+
+  /**
+   * Start auto-panning in the specified direction
+   */
+  private startAutoPan(x: number, y: number): void {
+    this.autoPanDirection = { x, y };
+
+    if (this.autoPanInterval === null) {
+      this.autoPanInterval = window.requestAnimationFrame(() => this.autoPan());
+    }
+  }
+
+  /**
+   * Stop auto-panning
+   */
+  private stopAutoPan(): void {
+    if (this.autoPanInterval !== null) {
+      window.cancelAnimationFrame(this.autoPanInterval);
+      this.autoPanInterval = null;
+    }
+    this.autoPanDirection = { x: 0, y: 0 };
+  }
+
+  /**
+   * Perform auto-pan animation
+   */
+  private autoPan(): void {
+    if (this.autoPanDirection.x === 0 && this.autoPanDirection.y === 0) {
+      this.stopAutoPan();
+      return;
+    }
+
+    const currentViewport = this.diagramStateService.viewport();
+    const newViewport = {
+      ...currentViewport,
+      x: currentViewport.x + (this.autoPanDirection.x * this.autoPanSpeed),
+      y: currentViewport.y + (this.autoPanDirection.y * this.autoPanSpeed)
+    };
+
+    this.diagramStateService.setViewport(newViewport);
+
+    // Continue animation
+    this.autoPanInterval = window.requestAnimationFrame(() => this.autoPan());
   }
 }
