@@ -1312,4 +1312,8 @@ export class DiagramStateService {
       node.position.y + nodeHeight < box.y
     );
   }
+
+  selectAllNodes(): void {
+    this.nodes.update((nodes) => nodes.map((n) => ({ ...n, selected: true })));
+  }
 }

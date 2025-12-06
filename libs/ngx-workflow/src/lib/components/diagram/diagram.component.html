@@ -1,6 +1,7 @@
 <div class="ngx-workflow__container" [attr.data-lod]="lodLevel">
   <ngx-workflow-background *ngIf="showBackground" [variant]="backgroundVariant" [gap]="backgroundGap"
     [size]="backgroundSize" [color]="backgroundColor" [backgroundColor]="backgroundBgColor"></ngx-workflow-background>
+  <ngx-workflow-grid-overlay *ngIf="showGrid" [gridSize]="gridSize"></ngx-workflow-grid-overlay>
   <svg #svg class="ngx-workflow__diagram" (wheel)="onWheel($event)" (pointerdown)="onPointerDown($event)"
     (dblclick)="onDiagramDoubleClick($event)">
     <defs>

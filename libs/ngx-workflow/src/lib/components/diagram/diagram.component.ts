@@ -12,6 +12,7 @@ import { ZoomControlsComponent } from '../zoom-controls/zoom-controls.component'
 import { UndoRedoControlsComponent } from '../undo-redo-controls/undo-redo-controls.component';
 import { MinimapComponent } from '../minimap/minimap.component';
 import { BackgroundComponent } from '../background/background.component';
+import { GridOverlayComponent } from '../grid-overlay/grid-overlay.component';
 import { AlignmentControlsComponent } from '../alignment-controls/alignment-controls.component';
 import { PropertiesSidebarComponent } from '../properties-sidebar/properties-sidebar.component';
 import { ContextMenuComponent } from '../context-menu/context-menu.component';
@@ -68,7 +69,7 @@ function getHandleAbsolutePosition(node: WorkflowNode, handleId: string | undefi
   styleUrls: ['./diagram.component.scss'],
   changeDetection: ChangeDetectionStrategy.OnPush,
   standalone: true,
-  imports: [CommonModule, ZoomControlsComponent, UndoRedoControlsComponent, MinimapComponent, BackgroundComponent, AlignmentControlsComponent, PropertiesSidebarComponent, SearchControlsComponent, ContextMenuComponent, NodeToolbarComponent, PanelComponent]
+  imports: [CommonModule, ZoomControlsComponent, UndoRedoControlsComponent, MinimapComponent, BackgroundComponent, GridOverlayComponent, AlignmentControlsComponent, PropertiesSidebarComponent, SearchControlsComponent, ContextMenuComponent, NodeToolbarComponent, PanelComponent]
 })
 export class DiagramComponent implements OnInit, OnDestroy, OnChanges {
   // Trigger rebuild
@@ -96,6 +97,11 @@ export class DiagramComponent implements OnInit, OnDestroy, OnChanges {
 
   // Color mode (theme) configuration
   @Input() colorMode: ColorMode = 'light';
+
+  // Grid configuration
+  @Input() gridSize: number = 20;
+  @Input() snapToGrid: boolean = false;
+  @Input() showGrid: boolean = false;
 
   // Auto-panning configuration
   @Input() autoPanOnNodeDrag: boolean = true;
@@ -635,6 +641,15 @@ export class DiagramComponent implements OnInit, OnDestroy, OnChanges {
       this.diagramStateService.ungroupNodes(selectedNodes[0].id);
     }
   }
+
+  @HostListener('window:keydown.control.a', ['$event'])
+  @HostListener('window:keydown.meta.a', ['$event'])
+  onSelectAllKeyPress(event: any): void {
+    if (this.isInputActive(event)) return;
+    event.preventDefault();
+    this.diagramStateService.selectAllNodes();
+  }
+
   @HostListener('window:keydown.arrowup', ['$event'])
   @HostListener('window:keydown.arrowdown', ['$event'])
   @HostListener('window:keydown.arrowleft', ['$event'])
